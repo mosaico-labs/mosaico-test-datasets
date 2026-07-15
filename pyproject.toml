@@ -5,10 +5,12 @@ description = "This package contains scripts to test ROS datasets with Mosaico P
 authors = [
     {name = "Pucciland95",email = "niccolo.lucci@mosaico.dev"}
 ]
-requires-python = ">=3.13, <4"
+requires-python = ">=3.10, <4"
 dependencies = [
     "click (>=8.3.2,<9.0.0)",
-    "rich (>=15.0.0,<16.0.0)"
+    "rich (>=15.0.0,<16.0.0)",
+    "rosbags (>=0.11.2,<0.12.0)",
+    "mosaicolabs"
 ]
 
 [project.scripts]
@@ -19,7 +21,8 @@ dependencies = [
 packages = [{include = "Datasets"}]
 
 [tool.poetry.dependencies]
-mosaicolabs = {path="./mosaico/mosaico-sdk-py", develop=true}
+mosaicolabs = {path = "./mosaico/mosaico-sdk-py", develop = true}
+
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
