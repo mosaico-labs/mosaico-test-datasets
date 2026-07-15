@@ -9,7 +9,7 @@
 
 set -euo pipefail
 
-DEST_DIR="${1:-${HOME}/rosbags/UZH-FPV}"
+DEST_DIR="${1:-${HOME}/rosbags}/UZH-FPV"
 
 # ---------------------------------------------------------------------------
 # Full bag list (source: https://fpv.ifi.uzh.ch/datasets/)
