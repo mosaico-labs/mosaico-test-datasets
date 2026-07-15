@@ -7,6 +7,7 @@ AVAILABLE_DATASET_MAP = {
     "autoware": "Autoware",
     "sugarbeets": "SugarBeets",
     "uzh_fpv": "UZH_FPV",
+    "agrikola": "Agrikola",
 }
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
