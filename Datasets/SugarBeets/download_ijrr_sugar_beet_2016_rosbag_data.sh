@@ -9,7 +9,7 @@
  
 set -euo pipefail
  
-DEST_DIR="${1:-${HOME}/rosbags/SugarBeets}"
+DEST_DIR="${1:-${HOME}/rosbags}/SugarBeets"
 SERVER="http://www.ipb.uni-bonn.de/datasets_IJRR2017/rosbags"
 MAX_PER_DAY=1
  
