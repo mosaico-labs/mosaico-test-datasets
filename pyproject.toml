@@ -21,7 +21,7 @@ dependencies = [
 packages = [{include = "Datasets"}]
 
 [tool.poetry.dependencies]
-mosaicolabs = {path = "./mosaico/mosaico-sdk-py", develop = true}
+mosaicolabs = {path = "../mosaico/mosaico-sdk-py", develop = true}
 
 
 [build-system]
