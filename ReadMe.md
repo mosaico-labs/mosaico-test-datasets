@@ -108,22 +108,22 @@ The CLI entry-point is registered by Poetry as
 poetry run mosaicolabs.datasets.injest_rosbags --help
 
 # Inject a single dataset
-poetry run mosaicolabs.datasets.injest_rosbags --dataset autoware
-poetry run mosaicolabs.datasets.injest_rosbags --dataset sugarbeets
-poetry run mosaicolabs.datasets.injest_rosbags --dataset uzh_fpv
+poetry run mosaicolabs.datasets.injest_rosbags --datasets autoware
+poetry run mosaicolabs.datasets.injest_rosbags --datasets sugarbeets
+poetry run mosaicolabs.datasets.injest_rosbags --datasets uzh_fpv
 
 # Inject multiple datasets in one go
-poetry run mosaicolabs.datasets.injest_rosbags --dataset autoware --dataset sugarbeets
+poetry run mosaicolabs.datasets.injest_rosbags --datasets autoware --datasets sugarbeets
 
 # Inject all datasets
-poetry run mosaicolabs.datasets.injest_rosbags --load_all
+poetry run mosaicolabs.datasets.injest_rosbags --all
 ```
 
 Use `--n_bags` to limit how many bags are injected per dataset — useful
 for smoke-testing without waiting for a full ingest:
 
 ```bash
-poetry run mosaicolabs.datasets.injest_rosbags --dataset autoware --n_bags 3
+poetry run mosaicolabs.datasets.injest_rosbags --datasets autoware --n_bags 3
 ```
 
 ### Configuration Keys
