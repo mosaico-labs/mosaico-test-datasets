@@ -1,7 +1,6 @@
 from rosbags.typesys import Stores
-from pathlib import Path
 
-PATH_TO_BAGS = Path.home() / "rosbags/SugarBeets"
+PATH_TO_BAGS = "/mnt/datasets/bags/SugarBeets"
 ROS_DISTRO = Stores.ROS1_NOETIC
 TOPICS_TO_FILTER = [
     "/camera/*",

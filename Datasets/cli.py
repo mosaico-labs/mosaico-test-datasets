@@ -1,4 +1,4 @@
-from .ros_datasets_injestor import RosDatasetsInjestor
+from .scripts import load_datasets, prune_datasets
 
 import click
 import sys
@@ -52,9 +52,8 @@ def run_dataset_injestor(datasets, all, n_bags):
     )
 
     try:
-        injestor = RosDatasetsInjestor()
-        injestor.load_datasets(datasets, n_bags)
-    
+        load_datasets(datasets, n_bags)
+
     except Exception as e:
         click.secho(f"\nExecution failed: {e}", fg="red", bold=True)
         sys.exit(1)
@@ -98,9 +97,8 @@ def run_dataset_eraser(datasets, all, n_bags):
     )
 
     try:
-        injestor = RosDatasetsInjestor()
-        injestor.prune_datasets(datasets, n_bags)
-    
+        prune_datasets(datasets, n_bags)
+
     except Exception as e:
         click.secho(f"\nExecution failed: {e}", fg="red", bold=True)
         sys.exit(1)

@@ -207,7 +207,7 @@ Edit `Datasets/MyDataset/configs.py` and set at least `PATH_TO_BAGS` and
 from rosbags.typesys import Stores
 from pathlib import Path
 
-PATH_TO_BAGS = Path.home() / "rosbags/MyDataset"
+PATH_TO_BAGS = "mnt/datasets/bags/MyDataset"
 ROS_DISTRO   = Stores.ROS2_JAZZY   # or Stores.ROS1_NOETIC, etc.
 
 # Optional: restrict which topics are injected.
