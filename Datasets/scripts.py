@@ -208,7 +208,7 @@ def load_datasets(
 
 def unload_datasets(
     datasets_name_to_unload: Optional[list[str]] = None,
-    n_bags_to_unload: Optional[int] = None,
+    n_sequences: Optional[int] = None,
 ) -> None:
     """Unload previously ingested datasets from Mosaico.
 
@@ -216,7 +216,7 @@ def unload_datasets(
         datasets_name_to_unload (list[str] | None): Optional whitelist of
             dataset folder names to process. When ``None`` (default) all
             discovered datasets are considered.
-        n_bags_to_unload (int | None): Optional cap on how many sequences to
+        n_sequences (int | None): Optional cap on how many sequences to
             unload per dataset. When ``None``, all matching sequences are
             unloaded.
 
@@ -248,8 +248,8 @@ def unload_datasets(
             )
             continue
 
-        if n_bags_to_unload is not None:
-            filtered_ros_bag_paths = ros_bag_paths[:n_bags_to_unload]
+        if n_sequences is not None:
+            filtered_ros_bag_paths = ros_bag_paths[:n_sequences]
         else:
             filtered_ros_bag_paths = ros_bag_paths
 
@@ -265,10 +265,13 @@ def unload_datasets(
                 )
                 continue
 
+            # Strip final file from bag_path
+            folder_bag_path = bag_path.parent
+
             sequence_name = get_name_from_rosbag(bag_path)
 
             ext_configs = ROSExtractorConfig(
-                rosbag_path=bag_path / "reconstructed",
+                rosbag_path=folder_bag_path,
                 sequence_name=sequence_name,
                 host=configs["MOSAICO_HOST"],
                 port=configs["MOSAICO_PORT"],
@@ -277,7 +280,7 @@ def unload_datasets(
                 topics=configs["TOPICS_TO_FILTER"],
                 log_level="WARNING",
                 mosaico_api_key=configs["API_KEY"],
-                # tls_cert_path=,
+                tls_cert_path=configs["TLS_CERT_PATH"],
                 enable_tls=configs["ENABLE_TLS"],
                 start_timestamp_ns=configs["START_TIMESTAMP_NS"],
                 end_timestamp_ns=configs["END_TIMESTAMP_NS"],

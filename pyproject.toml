@@ -16,6 +16,7 @@ dependencies = [
 [project.scripts]
 "mosaicolabs.datasets.injest_rosbags" = "Datasets.cli:run_dataset_injestor"
 "mosaicolabs.datasets.delete_rosbags" = "Datasets.cli:run_dataset_eraser"
+"mosaicolabs.datasets.recontruct_rosbags" = "Datasets.cli:run_unload_datasets"
 
 [tool.poetry]
 packages = [{include = "Datasets"}]
