@@ -8,6 +8,9 @@ AVAILABLE_DATASET_MAP = {
     "sugarbeets": "SugarBeets",
     "uzh_fpv": "UZH_FPV",
     "agrikola": "Agrikola",
+    "niulinx": "Niulinx",
+    "nvidia": "Nvidia",
+    "unipi": "Unipi",
 }
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])

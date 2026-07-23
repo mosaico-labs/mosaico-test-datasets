@@ -10,6 +10,8 @@ associated with a given rosbag sequence.
 
 from mosaicolabs.ros_bridge.loader import ROSLoader
 
+from typing import Any
+
 from pathlib import Path
 from typing import Optional
 import json
@@ -86,11 +88,11 @@ class RosbagHandler:
 
         return module
 
-    def _load_config(self) -> dict[str, str]:
+    def _load_config(self) -> dict[str, Any]:
         """Merge the global defaults with this dataset's config overrides.
 
         Returns:
-            dict[str, str] | None: Merged configuration dictionary, or
+            dict[str, Any] | None: Merged configuration dictionary, or
             ``None`` if the ``configs.py`` module could not be loaded.
         """
 
