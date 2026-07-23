@@ -1,5 +1,5 @@
 from rosbags.typesys import Stores
 
-PATH_TO_BAGS = "/mnt/datasets/bags/Unipi"
+PATH_TO_BAGS = "/mnt/datasets/bags/unipi"
 ROS_DISTRO = Stores.ROS2_JAZZY
 TOPICS_TO_FILTER = None

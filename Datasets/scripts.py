@@ -11,7 +11,7 @@ per-dataset configuration and metadata retrieval live in
 # Mosaico SDK Imports
 from mosaicolabs import SessionLevelErrorPolicy, MosaicoClient
 from mosaicolabs.ros_bridge import RosbagInjector, ROSInjectionConfig
-# from mosaicolabs.ros_bridge import ROSExtractorConfig, ROSSequenceExtractor
+from mosaicolabs.ros_bridge import ROSExtractorConfig, ROSSequenceExtractor
 
 from pathlib import Path
 from typing import Optional
@@ -84,9 +84,7 @@ def prune_datasets(
             if n_bags_to_prune is not None:
                 sequences_to_prune = sequences_to_prune[:n_bags_to_prune]
 
-            console.print(
-                f"[bold]Pruning {len(sequences_to_prune)} sequences [/bold]"
-            )
+            console.print(f"[bold]Pruning {len(sequences_to_prune)} sequences [/bold]")
 
             for seq in sequences_to_prune:
                 console.print(f"[bold]Pruning loaded sequence {seq} [/bold]")
@@ -208,46 +206,99 @@ def load_datasets(
         )
 
 
-# def unload_datasets(
-#     datasets_name_to_unload: Optional[list[str]] = None,
-#     n_bags_to_unload: Optional[int] = None,
-# ) -> None:
-#     """Unload previously ingested datasets from Mosaico.
+def unload_datasets(
+    datasets_name_to_unload: Optional[list[str]] = None,
+    n_bags_to_unload: Optional[int] = None,
+) -> None:
+    """Unload previously ingested datasets from Mosaico.
 
-#     Args:
-#         datasets_name_to_unload (list[str] | None): Optional whitelist of
-#             dataset folder names to process. When ``None`` (default) all
-#             discovered datasets are considered.
-#         n_bags_to_unload (int | None): Optional cap on how many sequences to
-#             unload per dataset. When ``None``, all matching sequences are
-#             unloaded.
+    Args:
+        datasets_name_to_unload (list[str] | None): Optional whitelist of
+            dataset folder names to process. When ``None`` (default) all
+            discovered datasets are considered.
+        n_bags_to_unload (int | None): Optional cap on how many sequences to
+            unload per dataset. When ``None``, all matching sequences are
+            unloaded.
 
-#     Returns:
-#         None
-#     """
+    Returns:
+        None
+    """
 
+    global_configs = load_global_config(BASE_DIR)
 
-#     for sequence in SEQUENCE_NAMES:
-#         configs = ROSExtractorConfig(
-#             rosbag_path=...,
-#             sequence_name=sequence,
-#             host=configs["MOSAICO_HOST"],
-#             port=configs["MOSAICO_PORT"],
-#             ros_distro=configs["ROS_DISTRO"],
-#             storage_plugin=configs["STORAGE_PLUGIN"],
-#             topics=configs["TOPICS_TO_FILTER"],
-#             log_level="WARNING",
-#             mosaico_api_key=configs["API_KEY"],
-#             # tls_cert_path=,
-#             enable_tls=configs["ENABLE_TLS"],
-#             start_timestamp_ns=,
-#             end_timestamp_ns=,
-#             overwrite=True,
-#         )
+    dataset_to_load_paths_ = discover_datasets(BASE_DIR, datasets_name_to_unload)
 
-#         # --- Execution ---
-#         extractor = ROSSequenceExtractor(configs)
-#         extractor.run()
+    for dataset_path in dataset_to_load_paths_:
+        console.print(
+            Panel(
+                f"[bold green] Started loading datasets {dataset_path.name} [/bold green]"
+            )
+        )
 
-if __name__ == "__main__":
-    load_datasets()
+        # 0) overriding default configuration for dataset loading
+        handler = RosbagHandler(dataset_path, global_configs)
+        configs = handler.config
+
+        # 1) Getting the rosbags (if present)
+        ros_bag_paths = handler.get_rosbag_paths()
+
+        if not ros_bag_paths:
+            console.print(
+                f"[bold yellow]No rosbags found at path {configs['PATH_TO_BAGS']}. Skipping this... [/bold yellow]"
+            )
+            continue
+
+        if n_bags_to_unload is not None:
+            filtered_ros_bag_paths = ros_bag_paths[:n_bags_to_unload]
+        else:
+            filtered_ros_bag_paths = ros_bag_paths
+
+        console.print(
+            f"[bold green]Loading {len(filtered_ros_bag_paths)} from {len(ros_bag_paths)} found bags from {configs['PATH_TO_BAGS']} [/bold green]"
+        )
+
+        unloaded_bags = 0
+        for bag_path in filtered_ros_bag_paths:
+            if not bag_path.is_file():
+                console.print(
+                    f"[bold yellow]{bag_path} is not a rosbag file. Skipping rosbag reconstruction[/bold yellow]"
+                )
+                continue
+
+            sequence_name = get_name_from_rosbag(bag_path)
+
+            ext_configs = ROSExtractorConfig(
+                rosbag_path=bag_path / "reconstructed",
+                sequence_name=sequence_name,
+                host=configs["MOSAICO_HOST"],
+                port=configs["MOSAICO_PORT"],
+                ros_distro=configs["ROS_DISTRO"],
+                storage_plugin=configs["STORAGE_PLUGIN"],
+                topics=configs["TOPICS_TO_FILTER"],
+                log_level="WARNING",
+                mosaico_api_key=configs["API_KEY"],
+                # tls_cert_path=,
+                enable_tls=configs["ENABLE_TLS"],
+                start_timestamp_ns=configs["START_TIMESTAMP_NS"],
+                end_timestamp_ns=configs["END_TIMESTAMP_NS"],
+                overwrite=True,
+            )
+
+            console.print(
+                f"[bold green]Starting rosbag reconstruction {ext_configs.sequence_name} - bag number {unloaded_bags + 1}/{len(filtered_ros_bag_paths)} [/bold green]"
+            )
+
+            # --- Execution ---
+            extractor = ROSSequenceExtractor(ext_configs)
+            extractor.run()
+
+            unloaded_bags += 1
+            console.print(
+                f"[bold green]Finished rosbag reconstruction {ext_configs.sequence_name} of {unloaded_bags}/{len(filtered_ros_bag_paths)} [/bold green]"
+            )
+
+        console.print(
+            Panel(
+                f"[bold green]Finished unloading datasets {dataset_path.name}[/bold green]"
+            )
+        )

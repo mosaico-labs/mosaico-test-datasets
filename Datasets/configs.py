@@ -7,3 +7,10 @@ TOPICS_TO_FILTER = None
 API_KEY=None
 ENABLE_TLS=False
 TLS_CERT_PATH=None
+
+
+# Global defaults — overridden per-dataset in each subfolder's configs.py
+# Unloading parameters
+STORAGE_PLUGIN = "MCAP" # possible: MCAP, SQLITE3
+START_TIMESTAMP = None
+STOP_TIMESTAMP = None
