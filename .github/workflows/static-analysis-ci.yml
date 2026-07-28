@@ -23,9 +23,11 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/ruff-action@v4.1.0 # executes ruff check by default (next line could be dropped)
-      - run: ruff check
-      - run: ruff format --check
-
+      - uses: actions/checkout@v6
+      
+      - name: Python SDK Lint
+        run: |
+          pipx install ruff
+          ruff format --check mosaico-sdk-py
+          ruff check mosaico-sdk-py
 
