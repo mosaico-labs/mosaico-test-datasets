@@ -24,7 +24,7 @@ jobs:
     
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/ruff-action@v4 # executes ruff check by default (next line could be dropped)
+      - uses: astral-sh/ruff-action@v4.1.0 # executes ruff check by default (next line could be dropped)
       - run: ruff check
       - run: ruff format --check
 
