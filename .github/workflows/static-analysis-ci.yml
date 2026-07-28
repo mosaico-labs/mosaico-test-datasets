@@ -1,0 +1,31 @@
+name: Static Analysis
+
+on: 
+  push:
+    branches: ["main"]
+    paths:
+      - "**.py"
+      - "**/pyproject.toml"
+      - "**/poetry.lock"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "**.py"
+      - "**/pyproject.toml"
+      - "**/poetry.lock"
+
+permissions:
+  contents: read
+
+jobs:
+  static-analysis:
+    name: "Static analysis"
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/ruff-action@v3 # executes ruff check by default (next line could be dropped)
+      - run: ruff check
+      - run: ruff format --check
+
+
