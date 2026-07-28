@@ -9,19 +9,21 @@ per-dataset configuration and metadata retrieval live in
 """
 
 # Mosaico SDK Imports
-from mosaicolabs import SessionLevelErrorPolicy, MosaicoClient
-from mosaicolabs.ros_bridge import RosbagInjector, ROSInjectionConfig
-from mosaicolabs.ros_bridge import ROSExtractorConfig, ROSSequenceExtractor
-
 from pathlib import Path
 from typing import Optional
 
+from mosaicolabs import MosaicoClient, SessionLevelErrorPolicy
+from mosaicolabs.ros_bridge import (
+    RosbagInjector,
+    ROSExtractorConfig,
+    ROSInjectionConfig,
+    ROSSequenceExtractor,
+)
 from rich.console import Console
 from rich.panel import Panel
 
 from .helper import discover_datasets, get_name_from_rosbag
 from .rosbag_handler import RosbagHandler, load_global_config
-
 
 # Initialize Rich Console for beautiful terminal output
 console = Console()

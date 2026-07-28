@@ -8,15 +8,12 @@ defaults, resolving where its rosbags live, and loading the JSON metadata
 associated with a given rosbag sequence.
 """
 
-from mosaicolabs.ros_bridge.loader import ROSLoader
-
-from typing import Any
-
-from pathlib import Path
-from typing import Optional
-import json
 import importlib.util
+import json
+from pathlib import Path
+from typing import Any, Optional
 
+from mosaicolabs.ros_bridge.loader import ROSLoader
 from rich.console import Console
 
 from .helper import DATASET_CONFIG_FILENAME

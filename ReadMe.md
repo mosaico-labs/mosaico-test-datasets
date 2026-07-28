@@ -259,7 +259,7 @@ from rosbags.typesys import Stores
 from pathlib import Path
 
 PATH_TO_BAGS = "mnt/datasets/bags/MyDataset"
-ROS_DISTRO   = Stores.ROS2_JAZZY   # or Stores.ROS1_NOETIC, etc.
+ROS_DISTRO = Stores.ROS2_JAZZY  # or Stores.ROS1_NOETIC, etc.
 
 # Optional: restrict which topics are injected.
 # Prefix a pattern with '!' to exclude it.
@@ -281,10 +281,10 @@ exact folder name:
 
 ```python
 AVAILABLE_DATASET_MAP = {
-    "autoware":   "Autoware",
+    "autoware": "Autoware",
     "sugarbeets": "SugarBeets",
-    "uzh_fpv":    "UZH_FPV",
-    "mydataset":  "MyDataset",   # <-- add this
+    "uzh_fpv": "UZH_FPV",
+    "mydataset": "MyDataset",  # <-- add this
 }
 ```
 

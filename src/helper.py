@@ -64,7 +64,9 @@ def discover_datasets(
     # Filtering accordingly to the passed datasets to load.
     # Notice that to filter effectively, the passed dataset names
     # need to coincide with the folder names
-    return [dt_path for dt_path in all_datasets if dt_path.name in dataset_names_to_load]
+    return [
+        dt_path for dt_path in all_datasets if dt_path.name in dataset_names_to_load
+    ]
 
 
 def get_name_from_rosbag(rosbag_path: Path) -> str:

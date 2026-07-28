@@ -1,7 +1,8 @@
-from .scripts import load_datasets, prune_datasets, unload_datasets
+import sys
 
 import click
-import sys
+
+from .scripts import load_datasets, prune_datasets, unload_datasets
 
 AVAILABLE_DATASET_MAP = {
     "autoware": "Autoware",

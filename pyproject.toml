@@ -10,7 +10,9 @@ dependencies = [
     "click (>=8.3.2,<9.0.0)",
     "rich (>=15.0.0,<16.0.0)",
     "rosbags (>=0.11.2,<0.12.0)",
-    "mosaicolabs"
+    "mosaicolabs",
+    "pre-commit (>=4.6.1,<5.0.0)",
+    "ruff (>=0.16.0,<0.17.0)"
 ]
 
 [project.scripts]
@@ -28,3 +30,19 @@ mosaicolabs = {path = "../mosaico/mosaico-sdk-py", develop = true}
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+# Ruff formatter and linter configurations
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["COM812", "E501"]
+
+[tool.ruff.format]
+skip-magic-trailing-comma = false
+quote-style = "double"
+indent-style = "space"
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
