@@ -184,6 +184,7 @@ def load_datasets(
                 enable_tls=configs["ENABLE_TLS"],
                 tls_cert_path=configs["TLS_CERT_PATH"],
             )
+            print("")
 
             console.print(
                 f"[bold green]Starting ROS injestion {injestor_config.sequence_name} - Size (MB): {bag_path.stat().st_size / (1024 * 1024):.2f} - bag number {loaded_bags + 1}/{len(filtered_rosbags)} [/bold green]"
