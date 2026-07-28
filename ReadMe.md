@@ -15,6 +15,7 @@ different ROS distributions and robot platforms.
 - [Installation](#installation)
 - [Running Mosaico Locally](#running-mosaico-locally)
 - [Loading Datasets](#loading-datasets)
+- [Reconstructing Datasets](#reconstructing-datasets)
 - [Pruning Datasets](#pruning-datasets)
 - [Adding a New Dataset](#adding-a-new-dataset)
 
@@ -143,6 +144,56 @@ are recognised:
 
 Global defaults live in `Datasets/configs.py`. Any key defined in a
 dataset-level `configs.py` overrides the corresponding global value.
+
+---
+
+## Reconstructing Datasets
+
+Previously ingested sequences can be pulled back out of Mosaico and rebuilt
+as local rosbag files. This is useful to verify that data survives a
+round-trip through the platform unchanged. The CLI entry-point
+`mosaicolabs.datasets.recontruct_rosbags` mirrors the loader interface:
+
+```bash
+# Show all available options
+poetry run mosaicolabs.datasets.recontruct_rosbags --help
+
+# Reconstruct a single dataset
+poetry run mosaicolabs.datasets.recontruct_rosbags --datasets autoware
+poetry run mosaicolabs.datasets.recontruct_rosbags --datasets sugarbeets
+poetry run mosaicolabs.datasets.recontruct_rosbags --datasets uzh_fpv
+
+# Reconstruct multiple datasets in one go
+poetry run mosaicolabs.datasets.recontruct_rosbags --datasets autoware --datasets sugarbeets
+
+# Reconstruct all datasets
+poetry run mosaicolabs.datasets.recontruct_rosbags --all
+```
+
+Use `--n_sequences` to limit how many sequences are reconstructed per
+dataset — useful for smoke-testing without waiting for a full round-trip:
+
+```bash
+poetry run mosaicolabs.datasets.recontruct_rosbags --datasets autoware --n_sequences 3
+```
+
+For every rosbag found under the dataset's `PATH_TO_BAGS`, the command
+derives the matching sequence name, downloads it from the Mosaico instance
+configured in the dataset's `configs.py`, and writes it back out as a new
+rosbag under `PATH_TO_RECONSTRUCTED_BAGS`, using the format selected via
+`STORAGE_PLUGIN`. Existing files at the destination are overwritten.
+
+### Reconstruction-specific configuration keys
+
+In addition to the [general configuration keys](#configuration-keys), the
+following keys control the reconstruction behaviour:
+
+| Key | Description | Default |
+|---|---|---|
+| `PATH_TO_RECONSTRUCTED_BAGS` | Directory where reconstructed rosbags are written | `"mnt/datasets/bags/reconstructed"` |
+| `STORAGE_PLUGIN` | Rosbag2 storage format used for the reconstructed bags (`StoragePlugin.MCAP` or `StoragePlugin.SQLITE3`) | `StoragePlugin.MCAP` |
+| `START_TIMESTAMP_NS` | Only reconstruct messages at or after this timestamp (nanoseconds) | `None` (from the start) |
+| `END_TIMESTAMP_NS` | Only reconstruct messages at or before this timestamp (nanoseconds) | `None` (until the end) |
 
 ---
 
