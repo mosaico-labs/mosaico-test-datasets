@@ -206,6 +206,9 @@ def load_datasets(
         )
 
 
+RECONSTRUCTED_ROSBAG_DIR = Path.home() / "reconstructed_rosbags"
+
+
 def unload_datasets(
     datasets_name_to_unload: Optional[list[str]] = None,
     n_sequences: Optional[int] = None,
@@ -227,6 +230,9 @@ def unload_datasets(
     global_configs = load_global_config(BASE_DIR)
 
     dataset_to_load_paths_ = discover_datasets(BASE_DIR, datasets_name_to_unload)
+
+    # Check that RECONSTRUCTED_ROSBAG_DIR exists and if not create it
+    RECONSTRUCTED_ROSBAG_DIR.mkdir(parents=True, exist_ok=True)
 
     for dataset_path in dataset_to_load_paths_:
         console.print(
@@ -266,12 +272,10 @@ def unload_datasets(
                 continue
 
             # Strip final file from bag_path
-            folder_bag_path = bag_path.parent
-
             sequence_name = get_name_from_rosbag(bag_path)
 
             ext_configs = ROSExtractorConfig(
-                rosbag_path=folder_bag_path,
+                rosbag_path=RECONSTRUCTED_ROSBAG_DIR / ("reconstructed_" + bag_path.stem),
                 sequence_name=sequence_name,
                 host=configs["MOSAICO_HOST"],
                 port=configs["MOSAICO_PORT"],
