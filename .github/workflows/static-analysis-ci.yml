@@ -2,13 +2,13 @@ name: Static Analysis
 
 on: 
   push:
-    branches: ["main"]
+    branches: ["master"]
     paths:
       - "**.py"
       - "**/pyproject.toml"
       - "**/poetry.lock"
   pull_request:
-    branches: ["main"]
+    branches: ["master"]
     paths:
       - "**.py"
       - "**/pyproject.toml"
