@@ -345,7 +345,7 @@ rosbags = "^0.11.2"
 typing-extensions = "^4.15.0"
 
 [package.extras]
-cli = ["tomli (>=2.0.0,<3.0.0) ; python_version < \"3.11\"", "typer (>=0.25.1,<0.27.0)"]
+cli = ["tomli (>=2.0.0,<3.0.0) ; python_version < \"3.11\"", "typer (>=0.25.1,<0.28.0)"]
 
 [package.source]
 type = "directory"
