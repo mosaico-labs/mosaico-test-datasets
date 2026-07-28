@@ -28,6 +28,6 @@ jobs:
       - name: Python SDK Lint
         run: |
           pipx install ruff
-          ruff format --check mosaico-sdk-py
-          ruff check mosaico-sdk-py
+          ruff format --check
+          ruff check
 

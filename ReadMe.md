@@ -31,30 +31,6 @@ different ROS distributions and robot platforms.
 
 ---
 
-## Project Structure
-
-```
-mosaico-test-datasets/
-├── Datasets/
-│   ├── configs.py              # Global default configuration
-│   ├── cli.py                  # CLI entry-point (click)
-│   ├── ros_datasets_injestor.py
-│   ├── Autoware/
-│   │   └── configs.py          # Autoware-specific overrides
-│   ├── SugarBeets/
-│   │   ├── configs.py
-│   │   └── download_ijrr_sugar_beet_2016_rosbag_data.sh
-│   └── UZH_FPV/
-│       ├── configs.py
-│       └── download_uzh_fpv.sh
-├── Docker/
-│   └── compose.mosaico.yml     # Local Mosaico stack
-├── pyproject.toml
-└── poetry.toml
-```
-
----
-
 ## Installation
 
 Install all Python dependencies with Poetry. No local Mosaico source checkout
@@ -68,6 +44,8 @@ cd mosaico-test-datasets
 # 2. Install dependencies (Poetry creates a .venv inside the project)
 poetry install
 ```
+
+> Note: Mosaico main repo should be available right next to `mosaico-test-datasets`
 
 ---
 
