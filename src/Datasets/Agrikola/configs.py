@@ -1,11 +1,11 @@
 from rosbags.typesys import Stores
 
-PATH_TO_BAGS = "/mnt/datasets/bags/Agrikola"
+PATH_TO_BAGS = "/home/niccolo/rosbags/Agrikola"
 ROS_DISTRO = Stores.ROS2_JAZZY
 TOPICS_TO_FILTER = None
 
 #  Name                      Start               End
 #  811_FUNGICIDE_2026_01_19… 1768842974382691465 1768843170694241088                                               
 #  926_BED_NAVIGATION_2026_… 1771422372422635825 1771422471642123928 
-START_TIMESTAMP_NS = None
-END_TIMESTAMP_NS = None
+START_TIMESTAMP_NS = 1768843074382691465
+END_TIMESTAMP_NS = 1771422401642123928

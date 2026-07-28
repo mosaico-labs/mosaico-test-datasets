@@ -27,6 +27,7 @@ from .rosbag_handler import RosbagHandler, load_global_config
 console = Console()
 
 BASE_DIR = Path(__file__).resolve().parent
+DATASETS_DIR = BASE_DIR / "Datasets"
 
 
 def prune_datasets(
@@ -47,7 +48,7 @@ def prune_datasets(
 
     global_configs = load_global_config(BASE_DIR)
 
-    dataset_to_prune_paths_ = discover_datasets(BASE_DIR, dataset_to_prune_name)
+    dataset_to_prune_paths_ = discover_datasets(DATASETS_DIR, dataset_to_prune_name)
 
     if not dataset_to_prune_paths_:
         console.print(
@@ -111,7 +112,7 @@ def load_datasets(
 
     global_configs = load_global_config(BASE_DIR)
 
-    dataset_to_load_paths_ = discover_datasets(BASE_DIR, datasets_name_to_load)
+    dataset_to_load_paths_ = discover_datasets(DATASETS_DIR, datasets_name_to_load)
 
     for dataset_path in dataset_to_load_paths_:
         console.print(
@@ -229,10 +230,7 @@ def unload_datasets(
 
     global_configs = load_global_config(BASE_DIR)
 
-    dataset_to_load_paths_ = discover_datasets(BASE_DIR, datasets_name_to_unload)
-
-    # Check that RECONSTRUCTED_ROSBAG_DIR exists and if not create it
-    RECONSTRUCTED_ROSBAG_DIR.mkdir(parents=True, exist_ok=True)
+    dataset_to_load_paths_ = discover_datasets(DATASETS_DIR, datasets_name_to_unload)
 
     for dataset_path in dataset_to_load_paths_:
         console.print(
@@ -275,7 +273,7 @@ def unload_datasets(
             sequence_name = get_name_from_rosbag(bag_path)
 
             ext_configs = ROSExtractorConfig(
-                rosbag_path=RECONSTRUCTED_ROSBAG_DIR / ("reconstructed_" + bag_path.stem),
+                rosbag_path=Path(configs["PATH_TO_RECONSTRUCTED_BAGS"]),
                 sequence_name=sequence_name,
                 host=configs["MOSAICO_HOST"],
                 port=configs["MOSAICO_PORT"],
