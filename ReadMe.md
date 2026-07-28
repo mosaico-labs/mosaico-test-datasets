@@ -11,7 +11,6 @@ different ROS distributions and robot platforms.
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
-- [Project Structure](#project-structure)
 - [Installation](#installation)
 - [Running Mosaico Locally](#running-mosaico-locally)
 - [Loading Datasets](#loading-datasets)
