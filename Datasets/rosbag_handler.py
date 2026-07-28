@@ -45,6 +45,7 @@ class RosbagHandler:
         "API_KEY",
         "ENABLE_TLS",
         "TLS_CERT_PATH",
+        "PATH_TO_RECONSTRUCTED_BAGS",
         "STORAGE_PLUGIN",
         "START_TIMESTAMP_NS",
         "END_TIMESTAMP_NS",
