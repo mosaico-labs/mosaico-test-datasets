@@ -387,7 +387,9 @@ def check_timestream_start(max_streasming_start_th_s: float):
                 start_streaming(stremer)
                 elapsed_time = time.monotonic() - start
 
-                console.print(f"[bold green]Sequence {seq_name} finished within time limit {START_STREAMING_TIMEOUT_S}s [/bold green]")
+                console.print(
+                    f"[bold green]Sequence {seq_name} finished within time limit {START_STREAMING_TIMEOUT_S}s [/bold green]"
+                )
 
                 table.add_row(
                     s_handler.name,
@@ -404,7 +406,9 @@ def check_timestream_start(max_streasming_start_th_s: float):
                     style="on red",
                 )
 
-                console.print(f"[bold red]Sequence {seq_name} did not finished within time limit {START_STREAMING_TIMEOUT_S}s [/bold red]")
+                console.print(
+                    f"[bold red]Sequence {seq_name} did not finished within time limit {START_STREAMING_TIMEOUT_S}s [/bold red]"
+                )
 
             stremer.close()
 
