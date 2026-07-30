@@ -1,6 +1,6 @@
 from rosbags.typesys import Stores
 
-PATH_TO_BAGS = "/home/niccolo/rosbags/Autoware"
+PATH_TO_BAGS = "/mnt/datasets/bags/Autoware"
 ROS_DISTRO = Stores.ROS2_JAZZY
 TOPICS_TO_FILTER = None  # [
 #     "/applanix/*",

@@ -19,6 +19,7 @@ dependencies = [
 "mosaicolabs.datasets.injest_rosbags" = "src.cli:run_dataset_injestor"
 "mosaicolabs.datasets.delete_rosbags" = "src.cli:run_dataset_eraser"
 "mosaicolabs.datasets.recontruct_rosbags" = "src.cli:run_unload_datasets"
+"mosaicolabs.datasets.check_start_streaming" = "src.cli:run_check_timestream_start"
 
 [tool.poetry]
 packages = [{include = "src"}]

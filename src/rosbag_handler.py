@@ -150,7 +150,7 @@ class RosbagHandler:
             return json.load(f)
 
 
-def load_global_config(base_dir: Path) -> dict[str, str]:
+def load_global_config(base_dir: Path) -> dict[str, Any]:
     """Load the global default configuration from ``base_dir/configs.py``."""
 
     return RosbagHandler(base_dir, global_configs={}).config or {}

@@ -9,10 +9,12 @@ per-dataset configuration and metadata retrieval live in
 """
 
 # Mosaico SDK Imports
+import signal
+import time
 from pathlib import Path
 from typing import Optional
 
-from mosaicolabs import MosaicoClient, SessionLevelErrorPolicy
+from mosaicolabs import MosaicoClient, SequenceDataStreamer, SessionLevelErrorPolicy
 from mosaicolabs.ros_bridge import (
     RosbagInjector,
     ROSExtractorConfig,
@@ -21,6 +23,7 @@ from mosaicolabs.ros_bridge import (
 )
 from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
 
 from .helper import discover_datasets, get_name_from_rosbag
 from .rosbag_handler import RosbagHandler, load_global_config
@@ -209,9 +212,6 @@ def load_datasets(
         )
 
 
-RECONSTRUCTED_ROSBAG_DIR = Path.home() / "reconstructed_rosbags"
-
-
 def unload_datasets(
     datasets_name_to_unload: Optional[list[str]] = None,
     n_sequences: Optional[int] = None,
@@ -309,3 +309,104 @@ def unload_datasets(
                 f"[bold green]Finished unloading datasets {dataset_path.name}[/bold green]"
             )
         )
+
+
+START_STREAMING_TIMEOUT_S = 1.0  # in seconds
+
+
+def kill_after_timeout(func):
+
+    def wrapper(*args, **kwargs):
+
+        def handler(signum, frame):
+            raise TimeoutError(
+                f"Function call exceded expeced timeout: {START_STREAMING_TIMEOUT_S}s"
+            )
+
+        old = signal.signal(signal.SIGALRM, handler)
+        signal.setitimer(signal.ITIMER_REAL, START_STREAMING_TIMEOUT_S)
+
+        try:
+            return func(*args, **kwargs)
+
+        finally:
+            # Resetting previous SIGNAL handler
+            signal.setitimer(signal.ITIMER_REAL, 0)  # always disarm the timer
+            signal.signal(signal.SIGALRM, old)  # restore prior handler
+
+    return wrapper
+
+
+@kill_after_timeout
+def start_streaming(stremer: SequenceDataStreamer):
+    for _, _ in stremer:
+        return  # returns immediatelly as soon as first message arrives
+
+
+def check_timestream_start(max_streasming_start_th_s: float):
+    """
+    This script executes a speedtest on how fast the streaming start for the loaded Mosaicos Sequences.
+    The test expects some sequences to be present within the Mosaico server and only their streaming speed
+    will be tested.
+
+    Args:
+        max_streasming_start_th_s (float): max time (in seconds) to wait for a stream to start. If the
+            streaming requires more that this time the sequence streaming is interrupted.
+    """
+
+    START_STREAMING_TIMEOUT_S = max_streasming_start_th_s
+
+    global_configs = load_global_config(BASE_DIR)
+
+    with MosaicoClient.connect(
+        host=global_configs["MOSAICO_HOST"],
+        port=global_configs["MOSAICO_PORT"],
+        api_key=global_configs["API_KEY"],
+        enable_tls=global_configs["ENABLE_TLS"],
+    ) as client:
+        all_loaded_sequences = client.list_sequences()
+
+        # Create table
+        table = Table(title="Streaming Time Table")
+        # Add columns
+        table.add_column("Sequence name", style="magenta")
+        table.add_column("Size", style="magenta")
+        table.add_column("Streaming start time (s)", style="green")
+
+        for seq_name in all_loaded_sequences:
+            console.print(f"[bold]Considering loaded sequence {seq_name} [/bold]")
+
+            s_handler = client.sequence_handler(seq_name)
+
+            assert s_handler is not None
+
+            stremer: SequenceDataStreamer = s_handler.get_data_streamer()
+
+            try:
+                start = time.monotonic()
+                start_streaming(stremer)
+                elapsed_time = time.monotonic() - start
+
+                console.print(f"[bold green]Sequence {seq_name} finished within time limit {START_STREAMING_TIMEOUT_S}s [/bold green]")
+
+                table.add_row(
+                    s_handler.name,
+                    f"{(s_handler.total_size_bytes / 1024.0 / 1024.0 / 1024.0):0.2f}Gb",
+                    f"{elapsed_time:0.2f}",
+                    style=None,
+                )
+
+            except TimeoutError:
+                table.add_row(
+                    s_handler.name,
+                    f"{(s_handler.total_size_bytes / 1024.0 / 1024.0 / 1024.0):0.2f}Gb",
+                    f"Greater than timeout {START_STREAMING_TIMEOUT_S}s",
+                    style="on red",
+                )
+
+                console.print(f"[bold red]Sequence {seq_name} did not finished within time limit {START_STREAMING_TIMEOUT_S}s [/bold red]")
+
+            stremer.close()
+
+        # printing resulting table
+        console.print(table)

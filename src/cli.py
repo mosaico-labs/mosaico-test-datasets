@@ -2,7 +2,12 @@ import sys
 
 import click
 
-from .scripts import load_datasets, prune_datasets, unload_datasets
+from .scripts import (
+    check_timestream_start,
+    load_datasets,
+    prune_datasets,
+    unload_datasets,
+)
 
 AVAILABLE_DATASET_MAP = {
     "autoware": "Autoware",
@@ -143,6 +148,28 @@ def run_unload_datasets(datasets, all, n_sequences):
 
     try:
         unload_datasets(datasets, n_sequences)
+
+    except Exception as e:
+        click.secho(f"\nExecution failed: {e}", fg="red", bold=True)
+        sys.exit(1)
+
+
+@click.command(context_settings=CONTEXT_SETTINGS)
+@click.option(
+    "--timeout",
+    default=1.0,
+    type=float,
+    help="Timeout before streaming is aborted.",
+)
+def run_check_timestream_start(timeout):
+    """
+    Mosaico dataset checking start streaming time. It requires some sequences to be loaded in the server
+
+    This utility allows you to start checking each sequence streaming time
+    """
+
+    try:
+        check_timestream_start(timeout)
 
     except Exception as e:
         click.secho(f"\nExecution failed: {e}", fg="red", bold=True)
