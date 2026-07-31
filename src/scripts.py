@@ -24,6 +24,7 @@ from mosaicolabs.ros_bridge import (
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+from rosbags.rosbag2 import StoragePlugin
 
 from .helper import discover_datasets, get_name_from_rosbag
 from .rosbag_handler import RosbagHandler, load_global_config
@@ -163,6 +164,16 @@ def load_datasets(
         )
 
         # 3) Injesting rosbags
+
+        # Create statistics table
+        table = Table(title="Uploading Rosbag Time Table")
+
+        # Add columns
+        table.add_column("Rosbag name", style="magenta")
+        table.add_column("Original bag size", style="magenta")
+        table.add_column("Mosaico sequence size", style="magenta")
+        table.add_column("Uploading time (s)", style="green")
+
         loaded_bags = 0
         for bag_path in filtered_rosbags:
             if not bag_path.is_file():
@@ -188,14 +199,41 @@ def load_datasets(
                 tls_cert_path=configs["TLS_CERT_PATH"],
             )
 
+            rosbag_size_mb = bag_path.stat().st_size / (1024 * 1024)
             console.print(
-                f"[bold green]Starting ROS injestion {injestor_config.sequence_name} - Size (MB): {bag_path.stat().st_size / (1024 * 1024):.2f} - bag number {loaded_bags + 1}/{len(filtered_rosbags)} [/bold green]"
+                f"[bold green]Starting ROS injestion {injestor_config.sequence_name} - Size (MB): {rosbag_size_mb:.2f} - bag number {loaded_bags + 1}/{len(filtered_rosbags)} [/bold green]"
             )
 
             injestor = RosbagInjector(injestor_config)
 
             try:
+                start = time.monotonic()
                 injestor.run()
+                elapsed_time = time.monotonic() - start
+
+                # Filling statistics table
+                with MosaicoClient.connect(
+                    host=configs["MOSAICO_HOST"],
+                    port=configs["MOSAICO_PORT"],
+                    api_key=configs["API_KEY"],
+                    enable_tls=configs["ENABLE_TLS"],
+                ) as client:
+                    s_hanlder = client.sequence_handler(sequence_name)
+
+                    assert s_hanlder is not None
+                    sequence_size_gb = (
+                        s_hanlder.total_size_bytes / 1024.0 / 1024.0 / 1024.0
+                    )  # Gb
+
+                    table.add_section()
+                    table.add_row(
+                        sequence_name,  # Rosbag name (coincides with loaded sequence name)
+                        f"{(rosbag_size_mb / 1024.0):.2f}",  # Original bag size
+                        f"{sequence_size_gb}",  # Mosaico sequence size (if available)
+                        f"{elapsed_time}",  # uploading time
+                        style=None,
+                    )
+
             except Exception as e:
                 console.print(f"[bold red]Injection Failed:[/bold red] {e}")
                 continue
@@ -204,6 +242,8 @@ def load_datasets(
             console.print(
                 f"[bold green]Finished ROS injestion {injestor_config.sequence_name} of {loaded_bags}/{len(filtered_rosbags)} [/bold green]"
             )
+
+        console.print(table)
 
         console.print(
             Panel(
@@ -263,6 +303,15 @@ def unload_datasets(
             f"[bold green]Loading {len(filtered_ros_bag_paths)} from {len(ros_bag_paths)} found bags from {configs['PATH_TO_BAGS']} [/bold green]"
         )
 
+        # Create statistics table
+        table = Table(title="Unloading Rosbag Time Table")
+
+        # Add columns
+        table.add_column("Rosbag name", style="magenta")
+        table.add_column("Mosaico sequence size", style="magenta")
+        table.add_column("Reconstructed bag size", style="magenta")
+        table.add_column("Unloading time (s)", style="green")
+
         unloaded_bags = 0
         for bag_path in filtered_ros_bag_paths:
             if not bag_path.is_file():
@@ -297,12 +346,63 @@ def unload_datasets(
 
             # --- Execution ---
             extractor = ROSSequenceExtractor(ext_configs)
-            extractor.run()
+
+            try:
+                start = time.monotonic()
+                extractor.run()
+                elapsed_time = time.monotonic() - start
+
+                # Filling statistics table
+
+                with MosaicoClient.connect(
+                    host=configs["MOSAICO_HOST"],
+                    port=configs["MOSAICO_PORT"],
+                    api_key=configs["API_KEY"],
+                    enable_tls=configs["ENABLE_TLS"],
+                ) as client:
+                    s_hanlder = client.sequence_handler(sequence_name)
+
+                    assert s_hanlder is not None
+                    sequence_size_gb = (
+                        s_hanlder.total_size_bytes / 1024.0 / 1024.0 / 1024.0
+                    )  # Gb
+
+                if configs["STORAGE_PLUGIN"] is StoragePlugin.MCAP:
+                    bag_extension = ".mcap"
+                elif configs["STORAGE_PLUGIN"] is StoragePlugin.SQLITE3:
+                    bag_extension = ".db3"
+                else:
+                    bag_extension = ".bag"
+
+                reconstructed_bag_file = (
+                    Path(configs["PATH_TO_RECONSTRUCTED_BAGS"])
+                    / sequence_name
+                    / (sequence_name + bag_extension)
+                )
+
+                reconstructed_size_gb = (
+                    reconstructed_bag_file.stat().st_size / 1024.0 / 1024.0 / 1024.0
+                )
+
+                table.add_section()
+                table.add_row(
+                    sequence_name,  # Rosbag name (coincides with unloaded sequence name)
+                    f"{sequence_size_gb}",  # Mosaico sequence size
+                    f"{reconstructed_size_gb}",  # Reconstructed bag size (on disk)
+                    f"{elapsed_time}",  # unloading time
+                    style=None,
+                )
+
+            except Exception as e:
+                console.print(f"[bold red]Extraction Failed:[/bold red] {e}")
+                continue
 
             unloaded_bags += 1
             console.print(
                 f"[bold green]Finished rosbag reconstruction {ext_configs.sequence_name} of {unloaded_bags}/{len(filtered_ros_bag_paths)} [/bold green]"
             )
+
+        console.print(table)
 
         console.print(
             Panel(
@@ -337,7 +437,7 @@ def kill_after_timeout(func):
     return wrapper
 
 
-@kill_after_timeout
+# @kill_after_timeout
 def start_streaming(stremer: SequenceDataStreamer):
     for _, _ in stremer:
         return  # returns immediatelly as soon as first message arrives
@@ -367,11 +467,17 @@ def check_timestream_start(max_streasming_start_th_s: float):
         all_loaded_sequences = client.list_sequences()
 
         # Create table
-        table = Table(title="Streaming Time Table")
+        table = Table(title="Streaming Sequence Time Table")
+
         # Add columns
         table.add_column("Sequence name", style="magenta")
-        table.add_column("Size", style="magenta")
+        table.add_column("Topic name", style="magenta")
+        table.add_column("Ontology Tag", style="magenta")
+        table.add_column("Sequence size", style="magenta")
+        table.add_column("Chunk numbers", style="magenta")
         table.add_column("Streaming start time (s)", style="green")
+
+        table.add_section()
 
         for seq_name in all_loaded_sequences:
             console.print(f"[bold]Considering loaded sequence {seq_name} [/bold]")
@@ -380,37 +486,65 @@ def check_timestream_start(max_streasming_start_th_s: float):
 
             assert s_handler is not None
 
-            stremer: SequenceDataStreamer = s_handler.get_data_streamer()
+            # Streaming test on sequence handler
+            sequence_stremer: SequenceDataStreamer = s_handler.get_data_streamer()
 
             try:
                 start = time.monotonic()
-                start_streaming(stremer)
+                start_streaming(sequence_stremer)
                 elapsed_time = time.monotonic() - start
 
-                console.print(
-                    f"[bold green]Sequence {seq_name} finished within time limit {START_STREAMING_TIMEOUT_S}s [/bold green]"
-                )
-
-                table.add_row(
-                    s_handler.name,
-                    f"{(s_handler.total_size_bytes / 1024.0 / 1024.0 / 1024.0):0.2f}Gb",
-                    f"{elapsed_time:0.2f}",
-                    style=None,
-                )
-
             except TimeoutError:
+                elapsed_time = START_STREAMING_TIMEOUT_S
+
+            table.add_row(
+                s_handler.name,  # Sequence name
+                "-",  # Topic name (not available here)
+                "-",  # Ontology tag (not available here)
+                f"{(s_handler.total_size_bytes / 1024.0 / 1024.0 / 1024.0):0.2f}Gb",  # Sequence size
+                "-",  # Chunk numbers (not available here)
+                f"{elapsed_time:0.2f}"
+                if elapsed_time < START_STREAMING_TIMEOUT_S
+                else f"Greater than timeout {START_STREAMING_TIMEOUT_S}s: {elapsed_time}",  # Streaming start time
+                style=None if elapsed_time < START_STREAMING_TIMEOUT_S else "on red",
+            )
+
+            sequence_stremer.close()
+
+            # Streaming test on each topic handler
+            for topic_name in s_handler.topics:
+                t_handler = client.topic_handler(seq_name, topic_name)
+
+                assert t_handler is not None
+
+                # Streaming test on topic handler
+                topic_stremer: SequenceDataStreamer = s_handler.get_data_streamer()
+
+                try:
+                    start = time.monotonic()
+                    start_streaming(topic_stremer)
+                    elapsed_time = time.monotonic() - start
+
+                except TimeoutError:
+                    elapsed_time = START_STREAMING_TIMEOUT_S
+
                 table.add_row(
-                    s_handler.name,
-                    f"{(s_handler.total_size_bytes / 1024.0 / 1024.0 / 1024.0):0.2f}Gb",
-                    f"Greater than timeout {START_STREAMING_TIMEOUT_S}s",
-                    style="on red",
+                    "-",  # Sequence name (not available here)
+                    t_handler.name,  # Topic name (not available here)
+                    t_handler.ontology_tag,  # Ontology tag
+                    "-",  # Sequence size (not available here)
+                    f"{t_handler.chunks_number}"
+                    if t_handler.chunks_number
+                    else "Unk",  # Chunk numbers
+                    f"{elapsed_time:0.2f}"
+                    if elapsed_time < START_STREAMING_TIMEOUT_S
+                    else f"Greater than timeout {START_STREAMING_TIMEOUT_S}s",  # Streaming start time
+                    style=None
+                    if elapsed_time < START_STREAMING_TIMEOUT_S
+                    else "on red",
                 )
 
-                console.print(
-                    f"[bold red]Sequence {seq_name} did not finished within time limit {START_STREAMING_TIMEOUT_S}s [/bold red]"
-                )
-
-            stremer.close()
+                topic_stremer.close()
 
         # printing resulting table
         console.print(table)
