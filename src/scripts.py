@@ -170,8 +170,8 @@ def load_datasets(
 
         # Add columns
         table.add_column("Rosbag name", style="magenta")
-        table.add_column("Original bag size", style="magenta")
-        table.add_column("Mosaico sequence size", style="magenta")
+        table.add_column("Original bag size(Gb)", style="magenta")
+        table.add_column("Mosaico sequence size(Gb)", style="magenta")
         table.add_column("Uploading time (s)", style="green")
 
         loaded_bags = 0
@@ -308,8 +308,8 @@ def unload_datasets(
 
         # Add columns
         table.add_column("Rosbag name", style="magenta")
-        table.add_column("Mosaico sequence size", style="magenta")
-        table.add_column("Reconstructed bag size", style="magenta")
+        table.add_column("Mosaico sequence size (Gb)", style="magenta")
+        table.add_column("Reconstructed bag size (Gb)", style="magenta")
         table.add_column("Unloading time (s)", style="green")
 
         unloaded_bags = 0

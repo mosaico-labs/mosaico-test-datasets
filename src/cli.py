@@ -14,7 +14,7 @@ AVAILABLE_DATASET_MAP = {
     "sugarbeets": "SugarBeets",
     "uzh_fpv": "UZH_FPV",
     "agrikola": "Agrikola",
-    "niulinx": "Niulinx",
+    # "niulinx": "Niulinx",
     "nvidia": "Nvidia",
     "unipi": "Unipi",
 }
