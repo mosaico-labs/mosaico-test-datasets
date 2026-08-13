@@ -81,6 +81,7 @@ def prune_datasets(
             port=configs["MOSAICO_PORT"],
             api_key=configs["API_KEY"],
             enable_tls=configs["ENABLE_TLS"],
+            tls_cert_path=configs["TLS_CERT_PATH"],
         ) as client:
             all_loaded_sequences = client.list_sequences()
 
@@ -147,6 +148,7 @@ def load_datasets(
             port=configs["MOSAICO_PORT"],
             api_key=configs["API_KEY"],
             enable_tls=configs["ENABLE_TLS"],
+            tls_cert_path=configs["TLS_CERT_PATH"],
         ) as client:
             all_loaded_sequences.extend(client.list_sequences())
 
@@ -217,6 +219,7 @@ def load_datasets(
                     port=configs["MOSAICO_PORT"],
                     api_key=configs["API_KEY"],
                     enable_tls=configs["ENABLE_TLS"],
+                    tls_cert_path=configs["TLS_CERT_PATH"],
                 ) as client:
                     s_hanlder = client.sequence_handler(sequence_name)
 
@@ -359,6 +362,7 @@ def unload_datasets(
                     port=configs["MOSAICO_PORT"],
                     api_key=configs["API_KEY"],
                     enable_tls=configs["ENABLE_TLS"],
+                    tls_cert_path=configs["TLS_CERT_PATH"],
                 ) as client:
                     s_hanlder = client.sequence_handler(sequence_name)
 
@@ -463,6 +467,7 @@ def check_timestream_start(max_streasming_start_th_s: float):
         port=global_configs["MOSAICO_PORT"],
         api_key=global_configs["API_KEY"],
         enable_tls=global_configs["ENABLE_TLS"],
+        tls_cert_path=global_configs["TLS_CERT_PATH"],
     ) as client:
         all_loaded_sequences = client.list_sequences()
 
