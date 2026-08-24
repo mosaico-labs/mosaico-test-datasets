@@ -12,10 +12,15 @@ different ROS distributions and robot platforms.
 
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
-- [Running Mosaico Locally](#running-mosaico-locally)
-- [Loading Datasets](#loading-datasets)
-- [Reconstructing Datasets](#reconstructing-datasets)
-- [Pruning Datasets](#pruning-datasets)
+  - [Running Mosaico Server](#running-mosaico-server)
+- [Datasets](#datasets)
+- [Global Configurations](#global-configurations)
+- [Commands](#commands)
+  - [1. Loading Datasets](#1-loading-datasets)
+  - [2. Reconstructing Datasets](#2-reconstructing-datasets)
+  - [3. Pruning Datasets](#3-pruning-datasets)
+  - [4. Checking Streaming Start](#4-checking-streaming-start)
+  - [5. Timing Statistics (upload + reconstruction)](#5-timing-statistics-upload--reconstruction)
 - [Adding a New Dataset](#adding-a-new-dataset)
 
 ---
@@ -46,23 +51,21 @@ poetry install
 
 > Note: Mosaico main repo should be available right next to `mosaico-test-datasets`
 
----
+### Running Mosaico Server
 
-## Running Mosaico Locally
+The injector scripts expect a Mosaico server to be reachable. Create the Mosaico Server as you prefer.
 
-The injector scripts expect a Mosaico server to be reachable. A ready-made
-Docker Compose file is provided under `Docker/`.
-
+Verify Mosaico server presence with:
 ```bash
-# Start the Mosaico stack (Postgres + mosaicod daemon)
-docker compose -f Docker/compose.mosaico.yml up -d
-
 # Verify the daemon is listening on port 6726
 curl http://localhost:6726
 ```
+---
+## Datasets
 
-The default configuration in `Datasets/configs.py` already points to
-`localhost:6726`, so no extra setup is needed for a local run.
+## Global Configurations
+
+The [configs.py](src/configs.py) file contains the global configurations shared among all the present [Datasets](src/Datasets/). Any key defined in a dataset-level `configs.py` overrides the corresponding global value (i.e. [src/Datasets/Agrikola/configs.py](src/Datasets/Agrikola/configs.py)).
 
 > **Note** — Before ingesting a dataset make sure the rosbag files are present
 > on disk at the path configured in the dataset's `configs.py`
@@ -70,41 +73,43 @@ The default configuration in `Datasets/configs.py` already points to
 > a download script can be used to fetch the bags automatically, e.g.:
 >
 > ```bash
-> bash Datasets/UZH_FPV/download_uzh_fpv.sh
-> bash Datasets/SugarBeets/download_ijrr_sugar_beet_2016_rosbag_data.sh
+> bash src/Datasets/UZH_FPV/download_uzh_fpv.sh
+> bash src/Datasets/SugarBeets/download_ijrr_sugar_beet_2016_rosbag_data.sh
 > ```
 
 ---
 
-## Loading Datasets
+## Commands
+
+### 1. Loading Datasets
 
 The CLI entry-point is registered by Poetry as
-`mosaicolabs.datasets.injest_rosbags`. Run it through `poetry run`:
+`mosaicolabs.datasets.ingest_rosbags`. Run it through `poetry run`:
 
 ```bash
 # Show all available options
-poetry run mosaicolabs.datasets.injest_rosbags --help
+poetry run mosaicolabs.datasets.ingest_rosbags --help
 
 # Inject a single dataset
-poetry run mosaicolabs.datasets.injest_rosbags --datasets autoware
-poetry run mosaicolabs.datasets.injest_rosbags --datasets sugarbeets
-poetry run mosaicolabs.datasets.injest_rosbags --datasets uzh_fpv
+poetry run mosaicolabs.datasets.ingest_rosbags --datasets autoware
+poetry run mosaicolabs.datasets.ingest_rosbags --datasets sugarbeets
+poetry run mosaicolabs.datasets.ingest_rosbags --datasets uzh_fpv
 
 # Inject multiple datasets in one go
-poetry run mosaicolabs.datasets.injest_rosbags --datasets autoware --datasets sugarbeets
+poetry run mosaicolabs.datasets.ingest_rosbags --datasets autoware --datasets sugarbeets
 
 # Inject all datasets
-poetry run mosaicolabs.datasets.injest_rosbags --all
+poetry run mosaicolabs.datasets.ingest_rosbags --all
 ```
 
 Use `--n_bags` to limit how many bags are injected per dataset — useful
 for smoke-testing without waiting for a full ingest:
 
 ```bash
-poetry run mosaicolabs.datasets.injest_rosbags --datasets autoware --n_bags 3
+poetry run mosaicolabs.datasets.ingest_rosbags --datasets autoware --n_bags 3
 ```
 
-### Configuration Keys
+#### Configuration Keys
 
 Every dataset is configured through a `configs.py` file. The following keys
 are recognised:
@@ -117,41 +122,42 @@ are recognised:
 | `ROS_DISTRO` | `rosbags` store type (e.g. `Stores.ROS2_JAZZY`) | `None` |
 | `TOPICS_TO_FILTER` | List of topic patterns to include/exclude (`!` prefix to exclude) | `None` (all topics) |
 | `API_KEY` | Mosaico API key for authenticated instances | `None` |
+| `ENABLE_TLS` | Whether to connect to the Mosaico daemon over TLS | `False` |
 | `TLS_CERT_PATH` | Path to a TLS certificate for encrypted connections | `None` |
 
-Global defaults live in `Datasets/configs.py`. Any key defined in a
+Global defaults live in `src/configs.py`. Any key defined in a
 dataset-level `configs.py` overrides the corresponding global value.
 
 ---
 
-## Reconstructing Datasets
+### 2. Reconstructing Datasets
 
 Previously ingested sequences can be pulled back out of Mosaico and rebuilt
 as local rosbag files. This is useful to verify that data survives a
 round-trip through the platform unchanged. The CLI entry-point
-`mosaicolabs.datasets.recontruct_rosbags` mirrors the loader interface:
+`mosaicolabs.datasets.reconstruct_rosbags` mirrors the loader interface:
 
 ```bash
 # Show all available options
-poetry run mosaicolabs.datasets.recontruct_rosbags --help
+poetry run mosaicolabs.datasets.reconstruct_rosbags --help
 
 # Reconstruct a single dataset
-poetry run mosaicolabs.datasets.recontruct_rosbags --datasets autoware
-poetry run mosaicolabs.datasets.recontruct_rosbags --datasets sugarbeets
-poetry run mosaicolabs.datasets.recontruct_rosbags --datasets uzh_fpv
+poetry run mosaicolabs.datasets.reconstruct_rosbags --datasets autoware
+poetry run mosaicolabs.datasets.reconstruct_rosbags --datasets sugarbeets
+poetry run mosaicolabs.datasets.reconstruct_rosbags --datasets uzh_fpv
 
 # Reconstruct multiple datasets in one go
-poetry run mosaicolabs.datasets.recontruct_rosbags --datasets autoware --datasets sugarbeets
+poetry run mosaicolabs.datasets.reconstruct_rosbags --datasets autoware --datasets sugarbeets
 
 # Reconstruct all datasets
-poetry run mosaicolabs.datasets.recontruct_rosbags --all
+poetry run mosaicolabs.datasets.reconstruct_rosbags --all
 ```
 
 Use `--n_sequences` to limit how many sequences are reconstructed per
 dataset — useful for smoke-testing without waiting for a full round-trip:
 
 ```bash
-poetry run mosaicolabs.datasets.recontruct_rosbags --datasets autoware --n_sequences 3
+poetry run mosaicolabs.datasets.reconstruct_rosbags --datasets autoware --n_sequences 3
 ```
 
 For every rosbag found under the dataset's `PATH_TO_BAGS`, the command
@@ -160,7 +166,7 @@ configured in the dataset's `configs.py`, and writes it back out as a new
 rosbag under `PATH_TO_RECONSTRUCTED_BAGS`, using the format selected via
 `STORAGE_PLUGIN`. Existing files at the destination are overwritten.
 
-### Reconstruction-specific configuration keys
+#### Reconstruction-specific configuration keys
 
 In addition to the [general configuration keys](#configuration-keys), the
 following keys control the reconstruction behaviour:
@@ -172,9 +178,12 @@ following keys control the reconstruction behaviour:
 | `START_TIMESTAMP_NS` | Only reconstruct messages at or after this timestamp (nanoseconds) | `None` (from the start) |
 | `END_TIMESTAMP_NS` | Only reconstruct messages at or before this timestamp (nanoseconds) | `None` (until the end) |
 
+Global defaults live in `src/configs.py`. Any key defined in a
+dataset-level `configs.py` overrides the corresponding global value.
+
 ---
 
-## Pruning Datasets
+### 3. Pruning Datasets
 
 Sequences that have already been ingested can be removed from the Mosaico
 server without touching the local rosbag files. The CLI entry-point
@@ -210,26 +219,65 @@ Sequences that belong to other datasets are never touched.
 
 ---
 
+### 4. Checking Streaming Start
+
+Measures how long it takes for each sequence currently loaded on the Mosaico
+server to start streaming — useful as a quick performance smoke test. It
+requires sequences to already be loaded (see [Loading Datasets](#1-loading-datasets)).
+The CLI entry-point is `mosaicolabs.datasets.check_start_streaming`:
+
+```bash
+# Show all available options
+poetry run mosaicolabs.datasets.check_start_streaming --help
+
+# Use a custom timeout (in seconds) before a stream is considered stuck
+poetry run mosaicolabs.datasets.check_start_streaming --timeout 2.0
+```
+
+Unlike the other commands, this one is not scoped by `--datasets`/`--all`: it
+connects using the global configuration in `src/configs.py` and reports on
+every sequence currently loaded on the server, regardless of which dataset
+originally loaded it.
+
+---
+
+### 5. Timing Statistics (upload + reconstruction)
+
+[`scripts/launch_timing_statistics.sh`](scripts/launch_timing_statistics.sh)
+launches a detached `tmux` session that runs ingestion followed by
+reconstruction, one dataset at a time, for a configurable list of datasets.
+Use it when you want to collect combined upload and rosbag reconstruction
+timing statistics across datasets in a single unattended run. See the
+comment block at the top of the script for the full usage details
+(configuration variables, log file locations, how to attach/detach from the
+session).
+
+```bash
+bash scripts/launch_timing_statistics.sh
+```
+
+---
+
 ## Adding a New Dataset
 
 Follow these steps to register a new ROS bag dataset.
 
 ### 1. Create the dataset folder
 
-Create a new sub-directory under `Datasets/` whose name will be used as the
-dataset identifier. The folder **must** contain a `configs.py` file (even if
-empty).
+Create a new sub-directory under `src/Datasets/` whose name will be used as
+the dataset identifier. The folder **must** contain a `configs.py` file (even
+if empty).
 
 ```
-Datasets/
+src/Datasets/
 └── MyDataset/
     └── configs.py
 ```
 
 ### 2. Configure the dataset
 
-Edit `Datasets/MyDataset/configs.py` and set at least `PATH_TO_BAGS` and
-`ROS_DISTRO`. Take `Datasets/Autoware/configs.py` as a reference:
+Edit `src/Datasets/MyDataset/configs.py` and set at least `PATH_TO_BAGS` and
+`ROS_DISTRO`. Take `src/Datasets/Autoware/configs.py` as a reference:
 
 ```python
 from rosbags.typesys import Stores
@@ -248,12 +296,12 @@ TOPICS_TO_FILTER = [
 ```
 
 Only the keys you define will override the global defaults; the rest inherit
-from `Datasets/configs.py`.
+from `src/configs.py`.
 
 ### 3. Register the dataset in the CLI
 
-Open `Datasets/cli.py` and add one entry to `AVAILABLE_DATASET_MAP` — the key
-is the name passed to `--dataset` (lowercase, underscores), the value is the
+Open `src/cli.py` and add one entry to `AVAILABLE_DATASET_MAP` — the key
+is the name passed to `--datasets` (lowercase, underscores), the value is the
 exact folder name:
 
 ```python
@@ -273,18 +321,18 @@ If the bags are publicly available, add a shell script to the dataset folder
 so other contributors can fetch them easily:
 
 ```
-Datasets/MyDataset/download_mydataset.sh
+src/Datasets/MyDataset/download_mydataset.sh
 ```
 
-See `Datasets/UZH_FPV/download_uzh_fpv.sh` for an example that uses `wget`
+See `src/Datasets/UZH_FPV/download_uzh_fpv.sh` for an example that uses `wget`
 with resume support and a success/failure summary.
 
 ### 5. Verify the setup
 
 ```bash
-# Check the new dataset appears in --help (it should be listed under --dataset choices)
-poetry run mosaicolabs.datasets.injest_rosbags --help
+# Check the new dataset appears in --help (it should be listed under --datasets choices)
+poetry run mosaicolabs.datasets.ingest_rosbags --help
 
 # Smoke-test with a single bag
-poetry run mosaicolabs.datasets.injest_rosbags --dataset mydataset --n_bags 1
+poetry run mosaicolabs.datasets.ingest_rosbags --datasets mydataset --n_bags 1
 ```
