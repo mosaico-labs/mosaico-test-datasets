@@ -62,7 +62,7 @@ curl http://localhost:6726
 ---
 ## Datasets
 
-## Global Configurations
+### Global Configurations
 
 The [configs.py](src/configs.py) file contains the global configurations shared among all the present [Datasets](src/Datasets/). Any key defined in a dataset-level `configs.py` overrides the corresponding global value (i.e. [src/Datasets/Agrikola/configs.py](src/Datasets/Agrikola/configs.py)).
 
@@ -75,8 +75,6 @@ The [configs.py](src/configs.py) file contains the global configurations shared 
 > bash src/Datasets/UZH_FPV/download_uzh_fpv.sh
 > bash src/Datasets/SugarBeets/download_ijrr_sugar_beet_2016_rosbag_data.sh
 > ```
-
----
 
 ## Commands
 
