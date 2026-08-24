@@ -53,11 +53,10 @@ poetry install
 
 ### Running Mosaico Server
 
-The injector scripts expect a Mosaico server to be reachable. Create the Mosaico Server as you prefer.
+All the next `commands` expect a live Mosaico server to be reachable. Create the Mosaico Server as you prefer and verify its presence with:
 
-Verify Mosaico server presence with:
 ```bash
-# Verify the daemon is listening on port 6726
+# Verify the daemon is listening on specified ip:port (in this case localhost:6276)
 curl http://localhost:6726
 ```
 ---
