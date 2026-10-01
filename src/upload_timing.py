@@ -3,7 +3,8 @@ Upload timing instrumentation for the Mosaico ROS injector.
 
 Splits the wall-clock time of a ``RosbagInjector.run()`` call into the time
 spent blocked on the Mosaico server and the time spent in client-side Python
-code (bag reading, ROS deserialization, adaptation, Arrow conversion, UI).
+code. The Python time is further split into rosbag reading and Mosaico SDK
+processing.
 
 The SDK upload pipeline is fully synchronous and single-threaded, so the
 server time can be measured by timing every blocking call that reaches the
@@ -17,6 +18,12 @@ server, and the Python time is what remains:
 - ``_do_action``: request/response RPCs (session create, topic create,
   finalize, sequence listing, ...).
 
+Rosbag reading is everything done by the ``rosbags`` library through
+``AnyReader``: opening and indexing the bag (``open``), reading the raw
+messages (``messages``) and deserializing them (``deserialize``). The SDK
+time is the remaining Python time: ROS message to dict conversion, adapter
+translation, Arrow conversion, injector logic and UI.
+
 NOTE: this patches private SDK internals (``_TopicWriteState`` and the
 ``_do_action`` references imported by each SDK module), so it may need
 updating when the SDK changes.
@@ -28,6 +35,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 from mosaicolabs.handlers.internal.topic_write_state import _TopicWriteState
+from rosbags.highlevel import AnyReader
 
 # SDK modules that import ``_do_action`` by name: each one keeps its own
 # reference, so each one must be patched.
@@ -48,7 +56,8 @@ class UploadTiming:
     write_s: float = 0.0  # DoPut batch transfers
     finalize_s: float = 0.0  # DoPut done_writing/close (server drain + ack)
     rpc_s: float = 0.0  # do_action round-trips
-    serialize_s: float = 0.0  # Python -> Arrow RecordBatch (subset of python_s)
+    rosbag_s: float = 0.0  # rosbags open + read + deserialize (subset of python_s)
+    serialize_s: float = 0.0  # Python -> Arrow RecordBatch (subset of sdk_s)
     n_batches: int = 0
     n_rpcs: int = 0
     rpc_breakdown: dict[str, float] = field(default_factory=dict)
@@ -60,6 +69,10 @@ class UploadTiming:
     @property
     def python_s(self) -> float:
         return self.total_s - self.server_s
+
+    @property
+    def sdk_s(self) -> float:
+        return self.python_s - self.rosbag_s
 
 
 class _TimedFlightWriter:
@@ -120,6 +133,40 @@ def measure_upload():
         finally:
             timing.serialize_s += time.perf_counter() - start
 
+    orig_reader_open = AnyReader.open
+    orig_reader_messages = AnyReader.messages
+    orig_reader_deserialize = AnyReader.deserialize
+
+    def timed_reader_open(self):
+        start = time.perf_counter()
+        try:
+            return orig_reader_open(self)
+        finally:
+            timing.rosbag_s += time.perf_counter() - start
+
+    def timed_reader_messages(self, *args, **kwargs):
+        # Times each step of the underlying generator, not the consumer's work
+        messages = orig_reader_messages(self, *args, **kwargs)
+        try:
+            while True:
+                start = time.perf_counter()
+                try:
+                    item = next(messages)
+                except StopIteration:
+                    return
+                finally:
+                    timing.rosbag_s += time.perf_counter() - start
+                yield item
+        finally:
+            messages.close()
+
+    def timed_reader_deserialize(self, *args, **kwargs):
+        start = time.perf_counter()
+        try:
+            return orig_reader_deserialize(self, *args, **kwargs)
+        finally:
+            timing.rosbag_s += time.perf_counter() - start
+
     patched_modules = []
     for mod_name in _DO_ACTION_MODULES:
         module = importlib.import_module(mod_name)
@@ -144,6 +191,9 @@ def measure_upload():
 
     _TopicWriteState.__init__ = timed_init
     _TopicWriteState._get_record_batch = timed_get_record_batch
+    AnyReader.open = timed_reader_open
+    AnyReader.messages = timed_reader_messages
+    AnyReader.deserialize = timed_reader_deserialize
 
     start = time.perf_counter()
     try:
@@ -152,5 +202,8 @@ def measure_upload():
         timing.total_s = time.perf_counter() - start
         _TopicWriteState.__init__ = orig_init
         _TopicWriteState._get_record_batch = orig_get_record_batch
+        AnyReader.open = orig_reader_open
+        AnyReader.messages = orig_reader_messages
+        AnyReader.deserialize = orig_reader_deserialize
         for module, orig_do_action in patched_modules:
             setattr(module, "_do_action", orig_do_action)
