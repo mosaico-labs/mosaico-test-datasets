@@ -28,6 +28,7 @@ from rosbags.rosbag2 import StoragePlugin
 
 from .helper import discover_datasets, get_name_from_rosbag
 from .rosbag_handler import RosbagHandler, load_global_config
+from .upload_timing import measure_upload
 
 # Initialize Rich Console for beautiful terminal output
 console = Console()
@@ -175,6 +176,11 @@ def load_datasets(
         table.add_column("Original bag size(Gb)", style="magenta")
         table.add_column("Mosaico sequence size(Gb)", style="magenta")
         table.add_column("Uploading time (s)", style="green")
+        table.add_column("Rosbag read (s)", style="cyan")
+        table.add_column("Mosaico SDK (s)", style="cyan")
+        table.add_column("  of which Arrow serialization (s)", style="cyan")
+        table.add_column("Server wait (s)", style="yellow")
+        table.add_column("  write / finalize / rpc (s)", style="yellow")
 
         loaded_bags = 0
         for bag_path in filtered_rosbags:
@@ -209,9 +215,8 @@ def load_datasets(
             injestor = RosbagInjector(injestor_config)
 
             try:
-                start = time.monotonic()
-                injestor.run()
-                elapsed_time = time.monotonic() - start
+                with measure_upload() as timing:
+                    injestor.run()
 
                 # Filling statistics table
                 with MosaicoClient.connect(
@@ -233,7 +238,12 @@ def load_datasets(
                         sequence_name,  # Rosbag name (coincides with loaded sequence name)
                         f"{(rosbag_size_mb / 1024.0):.2f}",  # Original bag size
                         f"{sequence_size_gb}",  # Mosaico sequence size (if available)
-                        f"{elapsed_time}",  # uploading time
+                        f"{timing.total_s:.2f}",  # uploading time
+                        f"{timing.rosbag_s:.2f}",  # rosbags open/read/deserialize
+                        f"{timing.sdk_s:.2f}",  # remaining client-side Python time
+                        f"{timing.serialize_s:.2f}",  # Python -> Arrow conversion
+                        f"{timing.server_s:.2f}",  # time blocked on the server
+                        f"{timing.write_s:.2f} / {timing.finalize_s:.2f} / {timing.rpc_s:.2f}",
                         style=None,
                     )
 
