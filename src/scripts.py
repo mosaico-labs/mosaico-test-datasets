@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Optional
 
 from mosaicolabs import MosaicoClient, SequenceDataStreamer, SessionLevelErrorPolicy
-from mosaicolabs.ros_bridge import (
+from mosaicolabs.bridges.ros import (
     RosbagInjector,
     ROSExtractorConfig,
     ROSInjectionConfig,
@@ -327,7 +327,7 @@ def unload_datasets(
             sequence_name = get_name_from_rosbag(bag_path)
 
             ext_configs = ROSExtractorConfig(
-                rosbag_path=Path(configs["PATH_TO_RECONSTRUCTED_BAGS"]),
+                saving_path=Path(configs["PATH_TO_RECONSTRUCTED_BAGS"]),
                 sequence_name=sequence_name,
                 host=configs["MOSAICO_HOST"],
                 port=configs["MOSAICO_PORT"],
