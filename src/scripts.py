@@ -27,6 +27,7 @@ from rich.table import Table
 from rosbags.rosbag2 import StoragePlugin
 
 from .helper import discover_datasets, get_name_from_rosbag
+from .metrics import MB, MetricsRecorder, upload_timing_to_dict
 from .rosbag_handler import RosbagHandler, load_global_config
 from .upload_timing import measure_upload
 
@@ -103,6 +104,7 @@ def prune_datasets(
 def load_datasets(
     datasets_name_to_load: Optional[list[str]] = None,
     n_bags_to_load: Optional[int] = None,
+    metrics_json_path: Optional[str] = None,
 ) -> None:
     """Ingest all discovered datasets into Mosaico.
 
@@ -113,12 +115,15 @@ def load_datasets(
         n_bags_to_load (int | None): Optional number stating how many rosbags
             should be uploaded for each dataset. When ``None``, all rosbags
             for each dataset are loaded.
+        metrics_json_path (str | None): Optional path of a JSON file where the
+            per-bag statistics are also written.
 
     Returns:
         None
     """
 
     global_configs = load_global_config(BASE_DIR)
+    metrics = MetricsRecorder(metrics_json_path, "ingest")
 
     dataset_to_load_paths_ = discover_datasets(DATASETS_DIR, datasets_name_to_load)
 
@@ -214,6 +219,7 @@ def load_datasets(
 
             injestor = RosbagInjector(injestor_config)
 
+            timing = None
             try:
                 with measure_upload() as timing:
                     injestor.run()
@@ -247,8 +253,30 @@ def load_datasets(
                         style=None,
                     )
 
+                metrics.add_bag(
+                    dataset_path.name,
+                    sequence_name,
+                    status="ok",
+                    bag_size_bytes=bag_path.stat().st_size,
+                    sequence_size_bytes=s_hanlder.total_size_bytes,
+                    throughput_mb_s=(rosbag_size_mb / timing.total_s)
+                    if timing.total_s > 0
+                    else None,
+                    timing=upload_timing_to_dict(timing),
+                )
+
             except Exception as e:
                 console.print(f"[bold red]Injection Failed:[/bold red] {e}")
+                metrics.add_bag(
+                    dataset_path.name,
+                    sequence_name,
+                    status="failed",
+                    error=str(e),
+                    bag_size_bytes=bag_path.stat().st_size,
+                    timing=upload_timing_to_dict(timing)
+                    if timing is not None
+                    else None,
+                )
                 continue
 
             loaded_bags += 1
@@ -264,10 +292,13 @@ def load_datasets(
             )
         )
 
+    metrics.finish()
+
 
 def unload_datasets(
     datasets_name_to_unload: Optional[list[str]] = None,
     n_sequences: Optional[int] = None,
+    metrics_json_path: Optional[str] = None,
 ) -> None:
     """Unload previously ingested datasets from Mosaico.
 
@@ -278,12 +309,15 @@ def unload_datasets(
         n_sequences (int | None): Optional cap on how many sequences to
             unload per dataset. When ``None``, all matching sequences are
             unloaded.
+        metrics_json_path (str | None): Optional path of a JSON file where the
+            per-sequence statistics are also written.
 
     Returns:
         None
     """
 
     global_configs = load_global_config(BASE_DIR)
+    metrics = MetricsRecorder(metrics_json_path, "reconstruct")
 
     dataset_to_load_paths_ = discover_datasets(DATASETS_DIR, datasets_name_to_unload)
 
@@ -407,8 +441,23 @@ def unload_datasets(
                     style=None,
                 )
 
+                metrics.add_bag(
+                    dataset_path.name,
+                    sequence_name,
+                    status="ok",
+                    sequence_size_bytes=s_hanlder.total_size_bytes,
+                    reconstructed_size_bytes=reconstructed_bag_file.stat().st_size,
+                    total_s=elapsed_time,
+                    throughput_mb_s=(s_hanlder.total_size_bytes / MB / elapsed_time)
+                    if elapsed_time > 0
+                    else None,
+                )
+
             except Exception as e:
                 console.print(f"[bold red]Extraction Failed:[/bold red] {e}")
+                metrics.add_bag(
+                    dataset_path.name, sequence_name, status="failed", error=str(e)
+                )
                 continue
 
             unloaded_bags += 1
@@ -423,6 +472,8 @@ def unload_datasets(
                 f"[bold green]Finished unloading datasets {dataset_path.name}[/bold green]"
             )
         )
+
+    metrics.finish()
 
 
 START_STREAMING_TIMEOUT_S = 1.0  # in seconds

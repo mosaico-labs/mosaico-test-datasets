@@ -37,7 +37,14 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     type=int,
     help="Number of bags to load per dataset. Omit to load all available bags.",
 )
-def run_dataset_injestor(datasets, all, n_bags):
+@click.option(
+    "--metrics-json",
+    "metrics_json",
+    default=None,
+    type=click.Path(dir_okay=False, writable=True),
+    help="Also write the statistics as JSON to this file.",
+)
+def run_dataset_injestor(datasets, all, n_bags, metrics_json):
     """
     Mosaico dataset loader Runner
 
@@ -59,7 +66,7 @@ def run_dataset_injestor(datasets, all, n_bags):
     click.secho(f"Requested injestion of {datasets} dataset(s)", fg="cyan", bold=True)
 
     try:
-        load_datasets(datasets, n_bags)
+        load_datasets(datasets, n_bags, metrics_json)
 
     except Exception as e:
         click.secho(f"\nExecution failed: {e}", fg="red", bold=True)
@@ -125,7 +132,14 @@ def run_dataset_eraser(datasets, all, n_bags):
     type=int,
     help="Number of bags to delete per dataset. Omit to delete all available bags.",
 )
-def run_unload_datasets(datasets, all, n_sequences):
+@click.option(
+    "--metrics-json",
+    "metrics_json",
+    default=None,
+    type=click.Path(dir_okay=False, writable=True),
+    help="Also write the statistics as JSON to this file.",
+)
+def run_unload_datasets(datasets, all, n_sequences, metrics_json):
     """
     Mosaico dataset Pruning Runner
 
@@ -147,7 +161,7 @@ def run_unload_datasets(datasets, all, n_sequences):
     click.secho(f"Requested pruning of {datasets} dataset(s)", fg="cyan", bold=True)
 
     try:
-        unload_datasets(datasets, n_sequences)
+        unload_datasets(datasets, n_sequences, metrics_json)
 
     except Exception as e:
         click.secho(f"\nExecution failed: {e}", fg="red", bold=True)

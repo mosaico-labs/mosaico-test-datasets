@@ -106,6 +106,14 @@ for smoke-testing without waiting for a full ingest:
 poetry run mosaicolabs.datasets.ingest_rosbags --datasets autoware --n_bags 3
 ```
 
+Use `--metrics-json` to also write the statistics table as JSON (one record
+per bag, with sizes, throughput and the full timing breakdown). The file is
+rewritten after every bag, so it can be polled while the ingest runs:
+
+```bash
+poetry run mosaicolabs.datasets.ingest_rosbags --datasets nvidia --metrics-json ingest.json
+```
+
 #### Configuration Keys
 
 Every dataset is configured through a `configs.py` file. The following keys
@@ -156,6 +164,9 @@ dataset — useful for smoke-testing without waiting for a full round-trip:
 ```bash
 poetry run mosaicolabs.datasets.reconstruct_rosbags --datasets autoware --n_sequences 3
 ```
+
+`--metrics-json` works here too and writes one record per reconstructed
+sequence.
 
 For every rosbag found under the dataset's `PATH_TO_BAGS`, the command
 derives the matching sequence name, downloads it from the Mosaico instance
