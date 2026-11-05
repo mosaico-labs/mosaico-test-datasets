@@ -3,14 +3,14 @@ repos:
     hooks:
       - id: ruff-check
         name: ruff check
-        entry: bash -c "poetry run ruff check --fix ."
+        entry: bash -c "uv run ruff check --fix ."
         language: system
         types: [python]
         pass_filenames: false
 
       - id: ruff-format
         name: ruff format
-        entry: bash -c "poetry run ruff format ."
+        entry: bash -c "uv run ruff format ."
         language: system
         types: [python]
         pass_filenames: false

@@ -21,16 +21,16 @@ dependencies = [
 "mosaicolabs.datasets.reconstruct_rosbags" = "src.cli:run_unload_datasets"
 "mosaicolabs.datasets.check_start_streaming" = "src.cli:run_check_timestream_start"
 
-[tool.poetry]
-packages = [{include = "src"}]
-
-[tool.poetry.dependencies]
-mosaicolabs = {path = "../mosaico/mosaico-sdk-py", develop = true, extras = ["cli"]}
-
+[tool.uv.sources]
+mosaicolabs = { path = "../mosaico/mosaico-sdk-py", editable = true }
 
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.13.1,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "src"
+module-root = ""
 
 # Ruff formatter and linter configurations
 [tool.ruff]
