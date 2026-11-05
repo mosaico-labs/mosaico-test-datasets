@@ -1,0 +1,2 @@
+bags = "/mnt/datasets/bags/SugarBeets"
+ros_distro = "ROS1_NOETIC"

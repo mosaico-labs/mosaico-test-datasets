@@ -5,32 +5,38 @@ description = "This package contains scripts to test ROS datasets with Mosaico P
 authors = [
     {name = "Pucciland95",email = "niccolo.lucci@mosaico.dev"}
 ]
-requires-python = ">=3.10, <4"
+requires-python = ">=3.11, <4"
 dependencies = [
     "click (>=8.3.2,<9.0.0)",
     "rich (>=15.0.0,<16.0.0)",
     "rosbags (>=0.11.2,<0.12.0)",
-    "mosaicolabs",
+    "mosaicolabs[cli]",
     "pre-commit (>=4.6.1,<5.0.0)",
     "ruff (>=0.16.0,<0.17.0)"
 ]
 
 [project.scripts]
+"mosaico-datasets" = "src.cli:main"
 "mosaicolabs.datasets.ingest_rosbags" = "src.cli:run_dataset_injestor"
 "mosaicolabs.datasets.delete_rosbags" = "src.cli:run_dataset_eraser"
 "mosaicolabs.datasets.reconstruct_rosbags" = "src.cli:run_unload_datasets"
 "mosaicolabs.datasets.check_start_streaming" = "src.cli:run_check_timestream_start"
 
-[tool.poetry]
-packages = [{include = "src"}]
-
-[tool.poetry.dependencies]
-mosaicolabs = {path = "../mosaico/mosaico-sdk-py", develop = true}
-
+[tool.uv.sources]
+mosaicolabs = { path = "../mosaico/mosaico-sdk-py", editable = true }
 
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.13.1,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
+
+[tool.uv.build-backend]
+module-name = "src"
+module-root = ""
 
 # Ruff formatter and linter configurations
 [tool.ruff]

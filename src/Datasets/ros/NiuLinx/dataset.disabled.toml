@@ -1,0 +1,4 @@
+# Disabled: left out of the old CLI's dataset list (reason not recorded).
+# Rename back to dataset.toml to enable it.
+bags = "/mnt/datasets/bags/Niulinx"
+ros_distro = "ROS2_HUMBLE"

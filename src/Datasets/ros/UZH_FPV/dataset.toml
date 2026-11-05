@@ -1,0 +1,2 @@
+bags = "/mnt/datasets/bags/UZH-FPV"
+ros_distro = "ROS1_NOETIC"

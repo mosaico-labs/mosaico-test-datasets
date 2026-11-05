@@ -30,23 +30,23 @@ different ROS distributions and robot platforms.
 | Requirement | Version |
 |---|---|
 | Python | ≥ 3.13 |
-| [Poetry](https://python-poetry.org/docs/#installation) | ≥ 2.0 |
+| [uv](https://docs.astral.sh/uv/getting-started/installation/) | ≥ 0.13 |
 | Docker + Docker Compose | any recent version |
 
 ---
 
 ## Installation
 
-Install all Python dependencies with Poetry. No local Mosaico source checkout
-is required — the `mosaicolabs` package is pulled from PyPI automatically.
+Install all Python dependencies with uv. The `mosaicolabs` package is installed
+in editable mode from the local Mosaico checkout (see the note below).
 
 ```bash
 # 1. Clone the repository
 git clone <repo-url>
 cd mosaico-test-datasets
 
-# 2. Install dependencies (Poetry creates a .venv inside the project)
-poetry install
+# 2. Install dependencies (uv creates a .venv inside the project)
+uv sync
 ```
 
 > Note: Mosaico main repo should be available right next to `mosaico-test-datasets`
@@ -64,7 +64,7 @@ curl http://localhost:6726
 
 ### Global Configurations
 
-The [configs.py](src/configs.py) file contains the global configurations shared among all the present [Datasets](src/Datasets/). Any key defined in a dataset-level `configs.py` overrides the corresponding global value (i.e. [src/Datasets/Agrikola/configs.py](src/Datasets/Agrikola/configs.py)).
+The [configs.py](src/configs.py) file contains the global configurations shared among all the present [Datasets](src/Datasets/ros/). Any key defined in a dataset-level `configs.py` overrides the corresponding global value (i.e. [src/Datasets/ros/Agrikola/configs.py](src/Datasets/ros/Agrikola/configs.py)).
 
 > **Note** — Before ingesting a dataset make sure the rosbag files are present
 > on disk at the path configured in the dataset's `configs.py`
@@ -72,38 +72,38 @@ The [configs.py](src/configs.py) file contains the global configurations shared 
 > a download script can be used to fetch the bags automatically, e.g.:
 >
 > ```bash
-> bash src/Datasets/UZH_FPV/download_uzh_fpv.sh
-> bash src/Datasets/SugarBeets/download_ijrr_sugar_beet_2016_rosbag_data.sh
+> bash src/Datasets/ros/UZH_FPV/download_uzh_fpv.sh
+> bash src/Datasets/ros/SugarBeets/download_ijrr_sugar_beet_2016_rosbag_data.sh
 > ```
 
 ## Commands
 
 ### 1. Loading Datasets
 
-The CLI entry-point is registered by Poetry as
-`mosaicolabs.datasets.ingest_rosbags`. Run it through `poetry run`:
+The CLI entry-point is registered as
+`mosaicolabs.datasets.ingest_rosbags`. Run it through `uv run`:
 
 ```bash
 # Show all available options
-poetry run mosaicolabs.datasets.ingest_rosbags --help
+uv run mosaicolabs.datasets.ingest_rosbags --help
 
 # Inject a single dataset
-poetry run mosaicolabs.datasets.ingest_rosbags --datasets autoware
-poetry run mosaicolabs.datasets.ingest_rosbags --datasets sugarbeets
-poetry run mosaicolabs.datasets.ingest_rosbags --datasets uzh_fpv
+uv run mosaicolabs.datasets.ingest_rosbags --datasets autoware
+uv run mosaicolabs.datasets.ingest_rosbags --datasets sugarbeets
+uv run mosaicolabs.datasets.ingest_rosbags --datasets uzh_fpv
 
 # Inject multiple datasets in one go
-poetry run mosaicolabs.datasets.ingest_rosbags --datasets autoware --datasets sugarbeets
+uv run mosaicolabs.datasets.ingest_rosbags --datasets autoware --datasets sugarbeets
 
 # Inject all datasets
-poetry run mosaicolabs.datasets.ingest_rosbags --all
+uv run mosaicolabs.datasets.ingest_rosbags --all
 ```
 
 Use `--n_bags` to limit how many bags are injected per dataset — useful
 for smoke-testing without waiting for a full ingest:
 
 ```bash
-poetry run mosaicolabs.datasets.ingest_rosbags --datasets autoware --n_bags 3
+uv run mosaicolabs.datasets.ingest_rosbags --datasets autoware --n_bags 3
 ```
 
 #### Configuration Keys
@@ -136,25 +136,25 @@ round-trip through the platform unchanged. The CLI entry-point
 
 ```bash
 # Show all available options
-poetry run mosaicolabs.datasets.reconstruct_rosbags --help
+uv run mosaicolabs.datasets.reconstruct_rosbags --help
 
 # Reconstruct a single dataset
-poetry run mosaicolabs.datasets.reconstruct_rosbags --datasets autoware
-poetry run mosaicolabs.datasets.reconstruct_rosbags --datasets sugarbeets
-poetry run mosaicolabs.datasets.reconstruct_rosbags --datasets uzh_fpv
+uv run mosaicolabs.datasets.reconstruct_rosbags --datasets autoware
+uv run mosaicolabs.datasets.reconstruct_rosbags --datasets sugarbeets
+uv run mosaicolabs.datasets.reconstruct_rosbags --datasets uzh_fpv
 
 # Reconstruct multiple datasets in one go
-poetry run mosaicolabs.datasets.reconstruct_rosbags --datasets autoware --datasets sugarbeets
+uv run mosaicolabs.datasets.reconstruct_rosbags --datasets autoware --datasets sugarbeets
 
 # Reconstruct all datasets
-poetry run mosaicolabs.datasets.reconstruct_rosbags --all
+uv run mosaicolabs.datasets.reconstruct_rosbags --all
 ```
 
 Use `--n_sequences` to limit how many sequences are reconstructed per
 dataset — useful for smoke-testing without waiting for a full round-trip:
 
 ```bash
-poetry run mosaicolabs.datasets.reconstruct_rosbags --datasets autoware --n_sequences 3
+uv run mosaicolabs.datasets.reconstruct_rosbags --datasets autoware --n_sequences 3
 ```
 
 For every rosbag found under the dataset's `PATH_TO_BAGS`, the command
@@ -188,25 +188,25 @@ server without touching the local rosbag files. The CLI entry-point
 
 ```bash
 # Show all available options
-poetry run mosaicolabs.datasets.delete_rosbags --help
+uv run mosaicolabs.datasets.delete_rosbags --help
 
 # Prune a single dataset
-poetry run mosaicolabs.datasets.delete_rosbags --datasets autoware
-poetry run mosaicolabs.datasets.delete_rosbags --datasets sugarbeets
-poetry run mosaicolabs.datasets.delete_rosbags --datasets uzh_fpv
+uv run mosaicolabs.datasets.delete_rosbags --datasets autoware
+uv run mosaicolabs.datasets.delete_rosbags --datasets sugarbeets
+uv run mosaicolabs.datasets.delete_rosbags --datasets uzh_fpv
 
 # Prune multiple datasets in one go
-poetry run mosaicolabs.datasets.delete_rosbags --datasets autoware --datasets sugarbeets
+uv run mosaicolabs.datasets.delete_rosbags --datasets autoware --datasets sugarbeets
 
 # Prune all datasets
-poetry run mosaicolabs.datasets.delete_rosbags --all
+uv run mosaicolabs.datasets.delete_rosbags --all
 ```
 
 Use `--n_bags` to limit how many sequences are pruned per dataset — useful
 when you only want to free up a portion of the loaded data:
 
 ```bash
-poetry run mosaicolabs.datasets.delete_rosbags --datasets autoware --n_bags 3
+uv run mosaicolabs.datasets.delete_rosbags --datasets autoware --n_bags 3
 ```
 
 The command connects to the Mosaico instance configured in the dataset's
@@ -225,10 +225,10 @@ The CLI entry-point is `mosaicolabs.datasets.check_start_streaming`:
 
 ```bash
 # Show all available options
-poetry run mosaicolabs.datasets.check_start_streaming --help
+uv run mosaicolabs.datasets.check_start_streaming --help
 
 # Use a custom timeout (in seconds) before a stream is considered stuck
-poetry run mosaicolabs.datasets.check_start_streaming --timeout 2.0
+uv run mosaicolabs.datasets.check_start_streaming --timeout 2.0
 ```
 
 Unlike the other commands, this one is not scoped by `--datasets`/`--all`: it
@@ -261,20 +261,20 @@ Follow these steps to register a new ROS bag dataset.
 
 ### 1. Create the dataset folder
 
-Create a new sub-directory under `src/Datasets/` whose name will be used as
+Create a new sub-directory under `src/Datasets/ros/` whose name will be used as
 the dataset identifier. The folder **must** contain a `configs.py` file (even
 if empty).
 
 ```
-src/Datasets/
+src/Datasets/ros/
 └── MyDataset/
     └── configs.py
 ```
 
 ### 2. Configure the dataset
 
-Edit `src/Datasets/MyDataset/configs.py` and set at least `PATH_TO_BAGS` and
-`ROS_DISTRO`. Take `src/Datasets/Autoware/configs.py` as a reference:
+Edit `src/Datasets/ros/MyDataset/configs.py` and set at least `PATH_TO_BAGS` and
+`ROS_DISTRO`. Take `src/Datasets/ros/Autoware/configs.py` as a reference:
 
 ```python
 from rosbags.typesys import Stores
@@ -318,18 +318,18 @@ If the bags are publicly available, add a shell script to the dataset folder
 so other contributors can fetch them easily:
 
 ```
-src/Datasets/MyDataset/download_mydataset.sh
+src/Datasets/ros/MyDataset/download_mydataset.sh
 ```
 
-See `src/Datasets/UZH_FPV/download_uzh_fpv.sh` for an example that uses `wget`
+See `src/Datasets/ros/UZH_FPV/download_uzh_fpv.sh` for an example that uses `wget`
 with resume support and a success/failure summary.
 
 ### 5. Verify the setup
 
 ```bash
 # Check the new dataset appears in --help (it should be listed under --datasets choices)
-poetry run mosaicolabs.datasets.ingest_rosbags --help
+uv run mosaicolabs.datasets.ingest_rosbags --help
 
 # Smoke-test with a single bag
-poetry run mosaicolabs.datasets.ingest_rosbags --datasets mydataset --n_bags 1
+uv run mosaicolabs.datasets.ingest_rosbags --datasets mydataset --n_bags 1
 ```
