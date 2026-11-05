@@ -1,14 +1,17 @@
 """
 Standalone helper functions used by the Mosaico dataset scripts.
 
-These are stateless utilities for discovering dataset folders on disk and
-deriving names from rosbag files. Config loading and metadata retrieval live
-in :class:`~Datasets.rosbag_handler.RosbagHandler` instead, since they carry
-per-dataset state.
+These are stateless utilities for discovering dataset folders on disk,
+deriving names from rosbag files, and the click options shared by every
+bridge's commands. Config loading and metadata retrieval live in
+:class:`~src.ros_bridge.RosbagHandler` instead, since they carry per-dataset
+state.
 """
 
 from pathlib import Path
 from typing import Optional
+
+import click
 
 DATASET_CONFIG_FILENAME = "configs.py"
 
@@ -73,3 +76,19 @@ def get_name_from_rosbag(rosbag_path: Path) -> str:
     """Derive the sequence name from a rosbag file path (its stem)."""
 
     return rosbag_path.with_suffix("").name
+
+
+def dataset_options(f):
+    """Add the ``DATASETS...``, ``--all`` and ``--n`` options to a command.
+
+    What ``--n`` counts is up to each command, which says so in its help.
+    """
+
+    f = click.option(
+        "--n",
+        type=int,
+        default=None,
+        help="Process only N items per dataset (see above for which).",
+    )(f)
+    f = click.option("--all", is_flag=True, help="Use every dataset.")(f)
+    return click.argument("datasets", nargs=-1)(f)

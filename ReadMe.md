@@ -64,7 +64,7 @@ curl http://localhost:6726
 
 ### Global Configurations
 
-The [configs.py](src/configs.py) file contains the global configurations shared among all the present [Datasets](src/Datasets/). Any key defined in a dataset-level `configs.py` overrides the corresponding global value (i.e. [src/Datasets/Agrikola/configs.py](src/Datasets/Agrikola/configs.py)).
+The [configs.py](src/configs.py) file contains the global configurations shared among all the present [Datasets](src/Datasets/ros/). Any key defined in a dataset-level `configs.py` overrides the corresponding global value (i.e. [src/Datasets/ros/Agrikola/configs.py](src/Datasets/ros/Agrikola/configs.py)).
 
 > **Note** — Before ingesting a dataset make sure the rosbag files are present
 > on disk at the path configured in the dataset's `configs.py`
@@ -72,8 +72,8 @@ The [configs.py](src/configs.py) file contains the global configurations shared 
 > a download script can be used to fetch the bags automatically, e.g.:
 >
 > ```bash
-> bash src/Datasets/UZH_FPV/download_uzh_fpv.sh
-> bash src/Datasets/SugarBeets/download_ijrr_sugar_beet_2016_rosbag_data.sh
+> bash src/Datasets/ros/UZH_FPV/download_uzh_fpv.sh
+> bash src/Datasets/ros/SugarBeets/download_ijrr_sugar_beet_2016_rosbag_data.sh
 > ```
 
 ## Commands
@@ -261,20 +261,20 @@ Follow these steps to register a new ROS bag dataset.
 
 ### 1. Create the dataset folder
 
-Create a new sub-directory under `src/Datasets/` whose name will be used as
+Create a new sub-directory under `src/Datasets/ros/` whose name will be used as
 the dataset identifier. The folder **must** contain a `configs.py` file (even
 if empty).
 
 ```
-src/Datasets/
+src/Datasets/ros/
 └── MyDataset/
     └── configs.py
 ```
 
 ### 2. Configure the dataset
 
-Edit `src/Datasets/MyDataset/configs.py` and set at least `PATH_TO_BAGS` and
-`ROS_DISTRO`. Take `src/Datasets/Autoware/configs.py` as a reference:
+Edit `src/Datasets/ros/MyDataset/configs.py` and set at least `PATH_TO_BAGS` and
+`ROS_DISTRO`. Take `src/Datasets/ros/Autoware/configs.py` as a reference:
 
 ```python
 from rosbags.typesys import Stores
@@ -318,10 +318,10 @@ If the bags are publicly available, add a shell script to the dataset folder
 so other contributors can fetch them easily:
 
 ```
-src/Datasets/MyDataset/download_mydataset.sh
+src/Datasets/ros/MyDataset/download_mydataset.sh
 ```
 
-See `src/Datasets/UZH_FPV/download_uzh_fpv.sh` for an example that uses `wget`
+See `src/Datasets/ros/UZH_FPV/download_uzh_fpv.sh` for an example that uses `wget`
 with resume support and a success/failure summary.
 
 ### 5. Verify the setup

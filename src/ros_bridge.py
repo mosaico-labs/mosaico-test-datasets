@@ -1,40 +1,176 @@
 """
-Scripts for the Mosaico dataset loader CLI.
+ROS bridge for the Mosaico dataset CLI.
 
-This module contains the top-level operations invoked from ``cli.py``:
-loading rosbag datasets into Mosaico, pruning previously loaded sequences,
-and (eventually) unloading them. Dataset discovery lives in ``helper.py``;
-per-dataset configuration and metadata retrieval live in
-``rosbag_handler.RosbagHandler``.
+Per-dataset configuration, metadata and rosbag discovery
+(:class:`RosbagHandler`), the operations that load, reconstruct and prune
+rosbag datasets on Mosaico, and the ``inject`` / ``extract`` / ``delete``
+click commands that ``cli.py`` registers under the ``ros`` name.
 """
 
-# Mosaico SDK Imports
-import signal
+import importlib.util
+import json
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
-from mosaicolabs import MosaicoClient, SequenceDataStreamer, SessionLevelErrorPolicy
+import click
+from mosaicolabs import MosaicoClient, SessionLevelErrorPolicy
 from mosaicolabs.bridges.ros import (
     RosbagInjector,
     ROSExtractorConfig,
     ROSInjectionConfig,
     ROSSequenceExtractor,
 )
+from mosaicolabs.bridges.ros.loader import ROSLoader
 from mosaicolabs_cli.utils.mosaico_profile import MosaicoProfile
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rosbags.rosbag2 import StoragePlugin
 
-from .helper import discover_datasets, get_name_from_rosbag
-from .rosbag_handler import RosbagHandler, load_global_config
+from .helper import (
+    DATASET_CONFIG_FILENAME,
+    dataset_options,
+    discover_datasets,
+    get_name_from_rosbag,
+)
 
 # Initialize Rich Console for beautiful terminal output
 console = Console()
 
+
+class RosbagHandler:
+    """Resolves configuration, metadata and rosbag paths for one dataset.
+
+    A handler is bound to a single dataset directory (the folder holding
+    that dataset's ``configs.py`` and ``metadata/``). Where to look for the
+    actual rosbag files is optional: pass ``rosbags_path`` to search a
+    specific directory, or omit it to fall back to the dataset's configured
+    ``PATH_TO_BAGS`` (and, failing that, the dataset directory itself).
+    """
+
+    DATASET_CONFIG_FILENAME = DATASET_CONFIG_FILENAME
+
+    CONFIG_KEY_NAMES = [
+        "PATH_TO_BAGS",
+        "ROS_DISTRO",
+        "TOPICS_TO_FILTER",
+        "PATH_TO_RECONSTRUCTED_BAGS",
+        "STORAGE_PLUGIN",
+        "START_TIMESTAMP_NS",
+        "END_TIMESTAMP_NS",
+    ]
+
+    def __init__(
+        self,
+        dataset_path: Path,
+        global_configs: dict[str, str],
+    ):
+        """Initialise the handler and eagerly resolve its configuration.
+
+        Args:
+            dataset_path (Path): Directory holding this dataset's
+                ``configs.py`` and ``metadata/`` folder.
+            global_configs (dict[str, str]): Global default configuration to
+                use as a base, overridden by the dataset's own ``configs.py``.
+        """
+
+        self.dataset_path = dataset_path
+        self.global_configs = global_configs
+        self.config = self._load_config()
+
+        if self.config["PATH_TO_BAGS"]:
+            self.rosbags_path = Path(self.config["PATH_TO_BAGS"])
+
+    def _get_config_module(self):
+        """Dynamically load this dataset's ``configs.py`` as a Python module.
+
+        Returns:
+            types.ModuleType | None: The loaded module object, or ``None``
+            if no ``configs.py`` could be found at ``dataset_path``.
+        """
+
+        spec = importlib.util.spec_from_file_location(
+            "cfg", self.dataset_path / self.DATASET_CONFIG_FILENAME
+        )
+
+        if spec is None:
+            return None
+
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        return module
+
+    def _load_config(self) -> dict[str, Any]:
+        """Merge the global defaults with this dataset's config overrides.
+
+        Returns:
+            dict[str, Any] | None: Merged configuration dictionary, or
+            ``None`` if the ``configs.py`` module could not be loaded.
+        """
+
+        config = {key: value for key, value in self.global_configs.items()}
+
+        module = self._get_config_module()
+        if module is None:
+            raise ModuleNotFoundError(
+                f"Could not load {self.dataset_path / self.DATASET_CONFIG_FILENAME} module. Does it exist?"
+            )
+
+        for cfg_key in self.CONFIG_KEY_NAMES:
+            if hasattr(module, cfg_key):
+                config[cfg_key] = getattr(module, cfg_key)
+
+        # Check that computed config dict contains all the necessary keys
+        if not all(mandatory_key in config for mandatory_key in self.CONFIG_KEY_NAMES):
+            raise KeyError(
+                f"Not all key are present within loaded config dict. Currently present keys are: {config.keys()}, while expected keys are f{self.CONFIG_KEY_NAMES}"
+            )
+
+        return config
+
+    def get_rosbag_paths(self) -> list[Path]:
+        """Find all rosbag files under ``self.rosbags_path``."""
+
+        return [
+            bp
+            for ext in ROSLoader.ACCEPTED_EXTENSIONS
+            for bp in self.rosbags_path.rglob(f"*{ext}")
+        ]
+
+    def get_metadata(self, rosbag_name: str) -> Optional[dict]:
+        """Load the JSON metadata associated with a rosbag sequence name."""
+
+        path_to_dataset_metadata = self.dataset_path / "metadata"
+
+        rosbag_metadata_path = next(
+            (
+                mtp
+                for mtp in path_to_dataset_metadata.glob("*.json")
+                if mtp.name.removesuffix(".json") == rosbag_name
+            ),
+            None,
+        )
+
+        if rosbag_metadata_path is None or not rosbag_metadata_path.exists():
+            console.print(
+                f"Impossible to find metadata for {rosbag_name} in {path_to_dataset_metadata}"
+            )
+            return None
+
+        with open(rosbag_metadata_path) as f:
+            return json.load(f)
+
+
+def load_global_config(base_dir: Path) -> dict[str, Any]:
+    """Load the global default configuration from ``base_dir/configs.py``."""
+
+    return RosbagHandler(base_dir, global_configs={}).config or {}
+
+
 BASE_DIR = Path(__file__).resolve().parent
-DATASETS_DIR = BASE_DIR / "Datasets"
+DATASETS_DIR = BASE_DIR / "Datasets" / "ros"
 
 
 def prune_datasets(
@@ -419,141 +555,64 @@ def unload_datasets(
         )
 
 
-START_STREAMING_TIMEOUT_S = 1.0  # in seconds
+# ---------------------------------------------------------------------------
+# Click commands, registered by cli.py as `<verb> ros`
+# ---------------------------------------------------------------------------
 
 
-def kill_after_timeout(func):
+def _select(datasets: tuple[str, ...], all: bool) -> list[str]:
+    """Validate the requested dataset names against the folders on disk."""
 
-    def wrapper(*args, **kwargs):
-
-        def handler(signum, frame):
-            raise TimeoutError(
-                f"Function call exceded expeced timeout: {START_STREAMING_TIMEOUT_S}s"
-            )
-
-        old = signal.signal(signal.SIGALRM, handler)
-        signal.setitimer(signal.ITIMER_REAL, START_STREAMING_TIMEOUT_S)
-
-        try:
-            return func(*args, **kwargs)
-
-        finally:
-            # Resetting previous SIGNAL handler
-            signal.setitimer(signal.ITIMER_REAL, 0)  # always disarm the timer
-            signal.signal(signal.SIGALRM, old)  # restore prior handler
-
-    return wrapper
+    valid = sorted(p.name for p in discover_datasets(DATASETS_DIR))
+    if all:
+        return valid
+    if not datasets:
+        raise click.UsageError(
+            f"Give dataset names or --all. Valid names: {', '.join(valid)}"
+        )
+    unknown = [d for d in datasets if d not in valid]
+    if unknown:
+        raise click.BadParameter(
+            f"unknown dataset(s) {', '.join(unknown)}. Valid names: {', '.join(valid)}",
+            param_hint="DATASETS",
+        )
+    return list(datasets)
 
 
-# @kill_after_timeout
-def start_streaming(stremer: SequenceDataStreamer):
-    for _, _ in stremer:
-        return  # returns immediatelly as soon as first message arrives
+def _run(fn, *args) -> None:
+    """Run an operation, turning any failure into a clean exit code 1."""
+
+    try:
+        fn(*args)
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
 
 
-def check_timestream_start(max_streasming_start_th_s: float):
+@click.command()
+@dataset_options
+def inject(datasets, all, n):
+    """Inject rosbag datasets into Mosaico.
+
+    --n N injects the first N bags of each dataset not yet on the server.
     """
-    This script executes a speedtest on how fast the streaming start for the loaded Mosaicos Sequences.
-    The test expects some sequences to be present within the Mosaico server and only their streaming speed
-    will be tested.
+    _run(load_datasets, _select(datasets, all), n)
 
-    Args:
-        max_streasming_start_th_s (float): max time (in seconds) to wait for a stream to start. If the
-            streaming requires more that this time the sequence streaming is interrupted.
+
+@click.command()
+@dataset_options
+def extract(datasets, all, n):
+    """Reconstruct rosbags from the sequences stored in Mosaico.
+
+    --n N reconstructs the first N bags of each dataset.
     """
+    _run(unload_datasets, _select(datasets, all), n)
 
-    START_STREAMING_TIMEOUT_S = max_streasming_start_th_s
 
-    profile = MosaicoProfile.resolve()
+@click.command()
+@dataset_options
+def delete(datasets, all, n):
+    """Delete a dataset's sequences from Mosaico.
 
-    with MosaicoClient.connect(
-        host=profile.host,
-        port=profile.port,
-        api_key=profile.api_key,
-        enable_tls=profile.enable_tls,
-        tls_cert_path=profile.tls_cert_path,
-    ) as client:
-        all_loaded_sequences = client.list_sequences()
-
-        # Create table
-        table = Table(title="Streaming Sequence Time Table")
-
-        # Add columns
-        table.add_column("Sequence name", style="magenta")
-        table.add_column("Topic name", style="magenta")
-        table.add_column("Ontology Tag", style="magenta")
-        table.add_column("Sequence size", style="magenta")
-        table.add_column("Chunk numbers", style="magenta")
-        table.add_column("Streaming start time (s)", style="green")
-
-        table.add_section()
-
-        for seq_name in all_loaded_sequences:
-            console.print(f"[bold]Considering loaded sequence {seq_name} [/bold]")
-
-            s_handler = client.sequence_handler(seq_name)
-
-            assert s_handler is not None
-
-            # Streaming test on sequence handler
-            sequence_stremer: SequenceDataStreamer = s_handler.get_data_streamer()
-
-            try:
-                start = time.monotonic()
-                start_streaming(sequence_stremer)
-                elapsed_time = time.monotonic() - start
-
-            except TimeoutError:
-                elapsed_time = START_STREAMING_TIMEOUT_S
-
-            table.add_row(
-                s_handler.name,  # Sequence name
-                "-",  # Topic name (not available here)
-                "-",  # Ontology tag (not available here)
-                f"{(s_handler.total_size_bytes / 1024.0 / 1024.0 / 1024.0):0.2f}Gb",  # Sequence size
-                "-",  # Chunk numbers (not available here)
-                f"{elapsed_time:0.2f}"
-                if elapsed_time < START_STREAMING_TIMEOUT_S
-                else f"Greater than timeout {START_STREAMING_TIMEOUT_S}s: {elapsed_time}",  # Streaming start time
-                style=None if elapsed_time < START_STREAMING_TIMEOUT_S else "on red",
-            )
-
-            sequence_stremer.close()
-
-            # Streaming test on each topic handler
-            for topic_name in s_handler.topics:
-                t_handler = client.topic_handler(seq_name, topic_name)
-
-                assert t_handler is not None
-
-                # Streaming test on topic handler
-                topic_stremer: SequenceDataStreamer = s_handler.get_data_streamer()
-
-                try:
-                    start = time.monotonic()
-                    start_streaming(topic_stremer)
-                    elapsed_time = time.monotonic() - start
-
-                except TimeoutError:
-                    elapsed_time = START_STREAMING_TIMEOUT_S
-
-                table.add_row(
-                    "-",  # Sequence name (not available here)
-                    t_handler.name,  # Topic name (not available here)
-                    t_handler.ontology_tag,  # Ontology tag
-                    "-",  # Sequence size (not available here)
-                    f"{t_handler.chunks_number}"
-                    if t_handler.chunks_number
-                    else "Unk",  # Chunk numbers
-                    f"{elapsed_time:0.2f}"
-                    if elapsed_time < START_STREAMING_TIMEOUT_S
-                    else f"Greater than timeout {START_STREAMING_TIMEOUT_S}s",  # Streaming start time
-                    style=None
-                    if elapsed_time < START_STREAMING_TIMEOUT_S
-                    else "on red",
-                )
-
-                topic_stremer.close()
-
-        # printing resulting table
-        console.print(table)
+    --n N deletes up to N of each dataset's sequences on the server.
+    """
+    _run(prune_datasets, _select(datasets, all), n)

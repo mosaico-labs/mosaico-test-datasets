@@ -16,6 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
+"mosaico-datasets" = "src.cli:main"
 "mosaicolabs.datasets.ingest_rosbags" = "src.cli:run_dataset_injestor"
 "mosaicolabs.datasets.delete_rosbags" = "src.cli:run_dataset_eraser"
 "mosaicolabs.datasets.reconstruct_rosbags" = "src.cli:run_unload_datasets"
