@@ -3,9 +3,8 @@ Standalone helper functions used by the Mosaico dataset scripts.
 
 These are stateless utilities for discovering dataset folders on disk,
 deriving names from rosbag files, and the click options shared by every
-bridge's commands. Config loading and metadata retrieval live in
-:class:`~src.ros_bridge.RosbagHandler` instead, since they carry per-dataset
-state.
+bridge's commands. Config loading lives in each bridge (e.g.
+:func:`src.ros_bridge.load`).
 """
 
 from pathlib import Path
@@ -13,7 +12,7 @@ from typing import Optional
 
 import click
 
-DATASET_CONFIG_FILENAME = "configs.py"
+DATASET_CONFIG_FILENAME = "dataset.toml"
 
 
 def is_valid_dataset(
@@ -22,7 +21,7 @@ def is_valid_dataset(
     """Check whether a path represents a valid dataset directory.
 
     A path is considered a valid dataset when it is a directory **and**
-    it contains a ``configs.py`` file (the file may be empty).
+    it contains a ``dataset.toml`` file.
 
     Args:
         path_to_dataset (Path): Filesystem path to evaluate.

@@ -1,17 +1,18 @@
 """
 ROS bridge for the Mosaico dataset CLI.
 
-Per-dataset configuration, metadata and rosbag discovery
-(:class:`RosbagHandler`), the operations that load, reconstruct and prune
-rosbag datasets on Mosaico, and the ``inject`` / ``extract`` / ``delete``
-click commands that ``cli.py`` registers under the ``ros`` name.
+Per-dataset configuration (:class:`RosDataset`, read from ``dataset.toml``),
+metadata and rosbag discovery, the operations that load, reconstruct and
+prune rosbag datasets on Mosaico, and the ``inject`` / ``extract`` /
+``delete`` click commands that ``cli.py`` registers under the ``ros`` name.
 """
 
-import importlib.util
 import json
 import time
+import tomllib
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 import click
 from mosaicolabs import MosaicoClient, SessionLevelErrorPolicy
@@ -27,7 +28,9 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rosbags.rosbag2 import StoragePlugin
+from rosbags.typesys import Stores
 
+from . import BASE_DIR, DATASETS_DIR
 from .helper import (
     DATASET_CONFIG_FILENAME,
     dataset_options,
@@ -39,138 +42,80 @@ from .helper import (
 console = Console()
 
 
-class RosbagHandler:
-    """Resolves configuration, metadata and rosbag paths for one dataset.
+@dataclass
+class RosDataset:
+    """One ROS dataset, as described by its ``dataset.toml``."""
 
-    A handler is bound to a single dataset directory (the folder holding
-    that dataset's ``configs.py`` and ``metadata/``). Where to look for the
-    actual rosbag files is optional: pass ``rosbags_path`` to search a
-    specific directory, or omit it to fall back to the dataset's configured
-    ``PATH_TO_BAGS`` (and, failing that, the dataset directory itself).
-    """
+    bags: Path
+    ros_distro: Stores
+    topics: list[str] | None = None
+    output: Path = Path("/mnt/datasets/bags/reconstructed")
+    storage_plugin: StoragePlugin = StoragePlugin.MCAP  # ignored by the SDK for ROS1
+    start_ns: int | None = None
+    end_ns: int | None = None
 
-    DATASET_CONFIG_FILENAME = DATASET_CONFIG_FILENAME
 
-    CONFIG_KEY_NAMES = [
-        "PATH_TO_BAGS",
-        "ROS_DISTRO",
-        "TOPICS_TO_FILTER",
-        "PATH_TO_RECONSTRUCTED_BAGS",
-        "STORAGE_PLUGIN",
-        "START_TIMESTAMP_NS",
-        "END_TIMESTAMP_NS",
-    ]
+def load(folder: Path) -> RosDataset:
+    """Read ``folder/dataset.toml``. Any problem raises ValueError naming the file."""
 
-    def __init__(
-        self,
-        dataset_path: Path,
-        global_configs: dict[str, str],
-    ):
-        """Initialise the handler and eagerly resolve its configuration.
+    file = folder / DATASET_CONFIG_FILENAME
+    try:
+        data = tomllib.loads(file.read_text())
+        ds = RosDataset(**data)
+        ds.ros_distro = Stores[ds.ros_distro]
+        if "storage_plugin" in data:
+            ds.storage_plugin = StoragePlugin[ds.storage_plugin]
+        # relative paths resolve against the dataset folder; absolute ones pass through
+        ds.bags, ds.output = folder / ds.bags, folder / ds.output
+        return ds
+    except KeyError as e:
+        raise ValueError(f"{file.relative_to(BASE_DIR)}: unknown value {e}") from None
+    except (OSError, TypeError, ValueError) as e:  # TOMLDecodeError is a ValueError
+        raise ValueError(f"{file.relative_to(BASE_DIR)}: {e}") from None
 
-        Args:
-            dataset_path (Path): Directory holding this dataset's
-                ``configs.py`` and ``metadata/`` folder.
-            global_configs (dict[str, str]): Global default configuration to
-                use as a base, overridden by the dataset's own ``configs.py``.
-        """
 
-        self.dataset_path = dataset_path
-        self.global_configs = global_configs
-        self.config = self._load_config()
+def load_all(names: Optional[list[str]] = None) -> dict[Path, RosDataset]:
+    """Load every selected dataset before any server work, reporting all bad files at once."""
 
-        if self.config["PATH_TO_BAGS"]:
-            self.rosbags_path = Path(self.config["PATH_TO_BAGS"])
+    configs, errors = {}, []
+    for folder in discover_datasets(DATASETS_DIR, names):
+        try:
+            configs[folder] = load(folder)
+        except ValueError as e:
+            errors.append(str(e))
+    if errors:
+        raise ValueError("bad dataset config(s):\n" + "\n".join(errors))
+    return configs
 
-    def _get_config_module(self):
-        """Dynamically load this dataset's ``configs.py`` as a Python module.
 
-        Returns:
-            types.ModuleType | None: The loaded module object, or ``None``
-            if no ``configs.py`` could be found at ``dataset_path``.
-        """
+def get_rosbag_paths(bags: Path) -> list[Path]:
+    """Find all rosbag files under ``bags``."""
 
-        spec = importlib.util.spec_from_file_location(
-            "cfg", self.dataset_path / self.DATASET_CONFIG_FILENAME
+    return [p for p in bags.rglob("*") if p.suffix in ROSLoader.ACCEPTED_EXTENSIONS]
+
+
+def get_metadata(dataset_path: Path, rosbag_name: str) -> Optional[dict]:
+    """Load the JSON metadata associated with a rosbag sequence name."""
+
+    path_to_dataset_metadata = dataset_path / "metadata"
+
+    rosbag_metadata_path = next(
+        (
+            mtp
+            for mtp in path_to_dataset_metadata.glob("*.json")
+            if mtp.name.removesuffix(".json") == rosbag_name
+        ),
+        None,
+    )
+
+    if rosbag_metadata_path is None or not rosbag_metadata_path.exists():
+        console.print(
+            f"Impossible to find metadata for {rosbag_name} in {path_to_dataset_metadata}"
         )
+        return None
 
-        if spec is None:
-            return None
-
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-
-        return module
-
-    def _load_config(self) -> dict[str, Any]:
-        """Merge the global defaults with this dataset's config overrides.
-
-        Returns:
-            dict[str, Any] | None: Merged configuration dictionary, or
-            ``None`` if the ``configs.py`` module could not be loaded.
-        """
-
-        config = {key: value for key, value in self.global_configs.items()}
-
-        module = self._get_config_module()
-        if module is None:
-            raise ModuleNotFoundError(
-                f"Could not load {self.dataset_path / self.DATASET_CONFIG_FILENAME} module. Does it exist?"
-            )
-
-        for cfg_key in self.CONFIG_KEY_NAMES:
-            if hasattr(module, cfg_key):
-                config[cfg_key] = getattr(module, cfg_key)
-
-        # Check that computed config dict contains all the necessary keys
-        if not all(mandatory_key in config for mandatory_key in self.CONFIG_KEY_NAMES):
-            raise KeyError(
-                f"Not all key are present within loaded config dict. Currently present keys are: {config.keys()}, while expected keys are f{self.CONFIG_KEY_NAMES}"
-            )
-
-        return config
-
-    def get_rosbag_paths(self) -> list[Path]:
-        """Find all rosbag files under ``self.rosbags_path``."""
-
-        return [
-            bp
-            for ext in ROSLoader.ACCEPTED_EXTENSIONS
-            for bp in self.rosbags_path.rglob(f"*{ext}")
-        ]
-
-    def get_metadata(self, rosbag_name: str) -> Optional[dict]:
-        """Load the JSON metadata associated with a rosbag sequence name."""
-
-        path_to_dataset_metadata = self.dataset_path / "metadata"
-
-        rosbag_metadata_path = next(
-            (
-                mtp
-                for mtp in path_to_dataset_metadata.glob("*.json")
-                if mtp.name.removesuffix(".json") == rosbag_name
-            ),
-            None,
-        )
-
-        if rosbag_metadata_path is None or not rosbag_metadata_path.exists():
-            console.print(
-                f"Impossible to find metadata for {rosbag_name} in {path_to_dataset_metadata}"
-            )
-            return None
-
-        with open(rosbag_metadata_path) as f:
-            return json.load(f)
-
-
-def load_global_config(base_dir: Path) -> dict[str, Any]:
-    """Load the global default configuration from ``base_dir/configs.py``."""
-
-    return RosbagHandler(base_dir, global_configs={}).config or {}
-
-
-BASE_DIR = Path(__file__).resolve().parent
-DATASETS_DIR = BASE_DIR / "Datasets" / "ros"
+    with open(rosbag_metadata_path) as f:
+        return json.load(f)
 
 
 def prune_datasets(
@@ -189,29 +134,18 @@ def prune_datasets(
         None
     """
 
-    global_configs = load_global_config(BASE_DIR)
+    datasets = load_all(dataset_to_prune_name)
     profile = MosaicoProfile.resolve()
 
-    dataset_to_prune_paths_ = discover_datasets(DATASETS_DIR, dataset_to_prune_name)
-
-    if not dataset_to_prune_paths_:
+    if not datasets:
         console.print(
             f"[bold red] Impossible to prune {dataset_to_prune_name}. These are not valid dataset names[/bold red]"
         )
 
-    for dt_path in dataset_to_prune_paths_:
-        handler = RosbagHandler(dt_path, global_configs)
-        configs = handler.config
-
-        if configs is None:
-            console.print(
-                f"[bold red]Failed loading dataset {dt_path}. Are you sure there is a config.py file? [/bold red]"
-            )
-            continue
-
+    for ds in datasets.values():
         # Sequence names coincide with rosbag names
         rosbag_names_to_prune = [
-            get_name_from_rosbag(bp) for bp in handler.get_rosbag_paths()
+            get_name_from_rosbag(bp) for bp in get_rosbag_paths(ds.bags)
         ]
 
         with MosaicoClient.connect(
@@ -255,28 +189,22 @@ def load_datasets(
         None
     """
 
-    global_configs = load_global_config(BASE_DIR)
+    datasets = load_all(datasets_name_to_load)
     profile = MosaicoProfile.resolve()
 
-    dataset_to_load_paths_ = discover_datasets(DATASETS_DIR, datasets_name_to_load)
-
-    for dataset_path in dataset_to_load_paths_:
+    for dataset_path, ds in datasets.items():
         console.print(
             Panel(
                 f"[bold green] Started loading datasets {dataset_path.name} [/bold green]"
             )
         )
 
-        # 0) overriding default configuration for dataset loading
-        handler = RosbagHandler(dataset_path, global_configs)
-        configs = handler.config
-
         # 1) Getting the rosbags (if present)
-        ros_bag_paths = handler.get_rosbag_paths()
+        ros_bag_paths = get_rosbag_paths(ds.bags)
 
         if not ros_bag_paths:
             console.print(
-                f"[bold yellow]No rosbags found at path {configs['PATH_TO_BAGS']}. Skipping this... [/bold yellow]"
+                f"[bold yellow]No rosbags found at path {ds.bags}. Skipping this... [/bold yellow]"
             )
             continue
 
@@ -301,7 +229,7 @@ def load_datasets(
             filtered_rosbags = filtered_rosbags[:n_bags_to_load]
 
         console.print(
-            f"[bold green]Loading {len(filtered_rosbags)} from {len(ros_bag_paths)} found bags from {configs['PATH_TO_BAGS']} [/bold green]"
+            f"[bold green]Loading {len(filtered_rosbags)} from {len(ros_bag_paths)} found bags from {ds.bags} [/bold green]"
         )
 
         # 3) Injesting rosbags
@@ -328,12 +256,12 @@ def load_datasets(
             injestor_config = ROSInjectionConfig(
                 file_path=bag_path,
                 sequence_name=sequence_name,
-                metadata=handler.get_metadata(sequence_name) or {},
+                metadata=get_metadata(dataset_path, sequence_name) or {},
                 host=profile.host,
                 port=profile.port,
                 log_level="WARNING",
-                topics=configs["TOPICS_TO_FILTER"],
-                ros_distro=configs["ROS_DISTRO"],
+                topics=ds.topics,
+                ros_distro=ds.ros_distro,
                 on_error=SessionLevelErrorPolicy.Delete,
                 mosaico_api_key=profile.api_key,
                 enable_tls=profile.enable_tls,
@@ -412,28 +340,22 @@ def unload_datasets(
         None
     """
 
-    global_configs = load_global_config(BASE_DIR)
+    datasets = load_all(datasets_name_to_unload)
     profile = MosaicoProfile.resolve()
 
-    dataset_to_load_paths_ = discover_datasets(DATASETS_DIR, datasets_name_to_unload)
-
-    for dataset_path in dataset_to_load_paths_:
+    for dataset_path, ds in datasets.items():
         console.print(
             Panel(
                 f"[bold green] Started loading datasets {dataset_path.name} [/bold green]"
             )
         )
 
-        # 0) overriding default configuration for dataset loading
-        handler = RosbagHandler(dataset_path, global_configs)
-        configs = handler.config
-
         # 1) Getting the rosbags (if present)
-        ros_bag_paths = handler.get_rosbag_paths()
+        ros_bag_paths = get_rosbag_paths(ds.bags)
 
         if not ros_bag_paths:
             console.print(
-                f"[bold yellow]No rosbags found at path {configs['PATH_TO_BAGS']}. Skipping this... [/bold yellow]"
+                f"[bold yellow]No rosbags found at path {ds.bags}. Skipping this... [/bold yellow]"
             )
             continue
 
@@ -443,7 +365,7 @@ def unload_datasets(
             filtered_ros_bag_paths = ros_bag_paths
 
         console.print(
-            f"[bold green]Loading {len(filtered_ros_bag_paths)} from {len(ros_bag_paths)} found bags from {configs['PATH_TO_BAGS']} [/bold green]"
+            f"[bold green]Loading {len(filtered_ros_bag_paths)} from {len(ros_bag_paths)} found bags from {ds.bags} [/bold green]"
         )
 
         # Create statistics table
@@ -467,19 +389,19 @@ def unload_datasets(
             sequence_name = get_name_from_rosbag(bag_path)
 
             ext_configs = ROSExtractorConfig(
-                saving_path=Path(configs["PATH_TO_RECONSTRUCTED_BAGS"]),
+                saving_path=ds.output,
                 sequence_name=sequence_name,
                 host=profile.host,
                 port=profile.port,
-                ros_distro=configs["ROS_DISTRO"],
-                storage_plugin=configs["STORAGE_PLUGIN"],
-                topics=configs["TOPICS_TO_FILTER"],
+                ros_distro=ds.ros_distro,
+                storage_plugin=ds.storage_plugin,
+                topics=ds.topics,
                 log_level="WARNING",
                 mosaico_api_key=profile.api_key,
                 tls_cert_path=profile.tls_cert_path,
                 enable_tls=profile.enable_tls,
-                start_timestamp_ns=configs["START_TIMESTAMP_NS"],
-                end_timestamp_ns=configs["END_TIMESTAMP_NS"],
+                start_timestamp_ns=ds.start_ns,
+                end_timestamp_ns=ds.end_ns,
                 overwrite=True,
             )
 
@@ -511,17 +433,16 @@ def unload_datasets(
                         s_hanlder.total_size_bytes / 1024.0 / 1024.0 / 1024.0
                     )  # Gb
 
-                if configs["STORAGE_PLUGIN"] is StoragePlugin.MCAP:
-                    bag_extension = ".mcap"
-                elif configs["STORAGE_PLUGIN"] is StoragePlugin.SQLITE3:
-                    bag_extension = ".db3"
-                else:
+                # Same rule as the SDK's writer: ROS1 always writes a .bag
+                if ds.ros_distro is Stores.ROS1_NOETIC:
                     bag_extension = ".bag"
+                elif ds.storage_plugin is StoragePlugin.MCAP:
+                    bag_extension = ".mcap"
+                else:
+                    bag_extension = ".db3"
 
                 reconstructed_bag_file = (
-                    Path(configs["PATH_TO_RECONSTRUCTED_BAGS"])
-                    / sequence_name
-                    / (sequence_name + bag_extension)
+                    ds.output / sequence_name / (sequence_name + bag_extension)
                 )
 
                 reconstructed_size_gb = (

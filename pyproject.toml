@@ -5,7 +5,7 @@ description = "This package contains scripts to test ROS datasets with Mosaico P
 authors = [
     {name = "Pucciland95",email = "niccolo.lucci@mosaico.dev"}
 ]
-requires-python = ">=3.10, <4"
+requires-python = ">=3.11, <4"
 dependencies = [
     "click (>=8.3.2,<9.0.0)",
     "rich (>=15.0.0,<16.0.0)",
@@ -28,6 +28,11 @@ mosaicolabs = { path = "../mosaico/mosaico-sdk-py", editable = true }
 [build-system]
 requires = ["uv_build>=0.13.1,<0.14.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
 
 [tool.uv.build-backend]
 module-name = "src"

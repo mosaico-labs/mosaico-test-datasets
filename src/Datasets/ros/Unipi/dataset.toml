@@ -1,0 +1,2 @@
+bags = "/mnt/datasets/bags/unipi"
+ros_distro = "ROS2_JAZZY"
