@@ -97,7 +97,7 @@ def get_rosbag_paths(bags: Path) -> list[Path]:
 def get_metadata(dataset_path: Path, rosbag_name: str) -> Optional[dict]:
     """Load the JSON metadata associated with a rosbag sequence name."""
 
-    #NOTE: this is only possible beacuse it looks that 1:1 sequence to metadata 
+    # NOTE: this is only possible beacuse it looks that 1:1 sequence to metadata
     path = dataset_path / "metadata" / f"{rosbag_name}.json"
     if not path.is_file():
         console.print(f"Impossible to find metadata for {rosbag_name} in {path.parent}")

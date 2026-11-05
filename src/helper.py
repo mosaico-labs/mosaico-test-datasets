@@ -21,7 +21,9 @@ def discover_datasets(base_dir: Path, names: Optional[list[str]] = None) -> list
     """Folders under ``base_dir`` holding a ``dataset.toml``, optionally
     restricted to the given folder names (exact, case-sensitive)."""
 
-    datasets = [p for p in base_dir.iterdir() if (p / DATASET_CONFIG_FILENAME).is_file()]
+    datasets = [
+        p for p in base_dir.iterdir() if (p / DATASET_CONFIG_FILENAME).is_file()
+    ]
     if names is None:
         return datasets
     return [p for p in datasets if p.name in names]
