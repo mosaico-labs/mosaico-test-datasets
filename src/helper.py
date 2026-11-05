@@ -2,7 +2,7 @@
 Standalone helper functions used by the Mosaico dataset scripts.
 
 These are stateless utilities for discovering dataset folders on disk,
-deriving names from rosbag files, and the click options shared by every
+connecting to Mosaico with a profile, and the click options shared by every
 bridge's commands. Config loading lives in each bridge (e.g.
 :func:`src.ros_bridge.load`).
 """
@@ -11,70 +11,32 @@ from pathlib import Path
 from typing import Optional
 
 import click
+from mosaicolabs import MosaicoClient
+from mosaicolabs_cli.utils.mosaico_profile import MosaicoProfile
 
 DATASET_CONFIG_FILENAME = "dataset.toml"
 
 
-def is_valid_dataset(
-    path_to_dataset: Path, config_filename: str = DATASET_CONFIG_FILENAME
-) -> bool:
-    """Check whether a path represents a valid dataset directory.
+def discover_datasets(base_dir: Path, names: Optional[list[str]] = None) -> list[Path]:
+    """Folders under ``base_dir`` holding a ``dataset.toml``, optionally
+    restricted to the given folder names (exact, case-sensitive)."""
 
-    A path is considered a valid dataset when it is a directory **and**
-    it contains a ``dataset.toml`` file.
-
-    Args:
-        path_to_dataset (Path): Filesystem path to evaluate.
-        config_filename (str): Name of the per-dataset config file to look for.
-
-    Returns:
-        bool: ``True`` if the path is a directory containing the config
-        file, ``False`` otherwise.
-    """
-
-    return path_to_dataset.is_dir() and (path_to_dataset / config_filename).is_file()
+    datasets = [p for p in base_dir.iterdir() if (p / DATASET_CONFIG_FILENAME).is_file()]
+    if names is None:
+        return datasets
+    return [p for p in datasets if p.name in names]
 
 
-def discover_datasets(
-    base_dir: Path,
-    dataset_names_to_load: Optional[list[str]] = None,
-    config_filename: str = DATASET_CONFIG_FILENAME,
-) -> list[Path]:
-    """Discover all valid dataset directories under ``base_dir``.
+def connect(profile: MosaicoProfile) -> MosaicoClient:
+    """Open a Mosaico client from a resolved profile."""
 
-    Args:
-        base_dir (Path): Root directory to search for dataset folders.
-        dataset_names_to_load (list[str] | None): Optional whitelist of
-            folder names. Folder names must match exactly (case-sensitive).
-            Pass ``None`` to return all discovered datasets.
-        config_filename (str): Name of the per-dataset config file to look for.
-
-    Returns:
-        list[Path]: Paths to the discovered (and optionally filtered)
-        dataset directories.
-    """
-
-    all_datasets = [
-        entry
-        for entry in base_dir.iterdir()
-        if is_valid_dataset(entry, config_filename)
-    ]
-
-    if dataset_names_to_load is None:
-        return all_datasets
-
-    # Filtering accordingly to the passed datasets to load.
-    # Notice that to filter effectively, the passed dataset names
-    # need to coincide with the folder names
-    return [
-        dt_path for dt_path in all_datasets if dt_path.name in dataset_names_to_load
-    ]
-
-
-def get_name_from_rosbag(rosbag_path: Path) -> str:
-    """Derive the sequence name from a rosbag file path (its stem)."""
-
-    return rosbag_path.with_suffix("").name
+    return MosaicoClient.connect(
+        host=profile.host,
+        port=profile.port,
+        api_key=profile.api_key,
+        enable_tls=profile.enable_tls,
+        tls_cert_path=profile.tls_cert_path,
+    )
 
 
 def dataset_options(f):

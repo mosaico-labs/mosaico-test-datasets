@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Optional
 
 import click
-from mosaicolabs import MosaicoClient, SessionLevelErrorPolicy
+from mosaicolabs import SessionLevelErrorPolicy
 from mosaicolabs.bridges.ros import (
     RosbagInjector,
     ROSExtractorConfig,
@@ -33,9 +33,9 @@ from rosbags.typesys import Stores
 from . import BASE_DIR, DATASETS_DIR
 from .helper import (
     DATASET_CONFIG_FILENAME,
+    connect,
     dataset_options,
     discover_datasets,
-    get_name_from_rosbag,
 )
 
 # Initialize Rich Console for beautiful terminal output
@@ -97,25 +97,12 @@ def get_rosbag_paths(bags: Path) -> list[Path]:
 def get_metadata(dataset_path: Path, rosbag_name: str) -> Optional[dict]:
     """Load the JSON metadata associated with a rosbag sequence name."""
 
-    path_to_dataset_metadata = dataset_path / "metadata"
-
-    rosbag_metadata_path = next(
-        (
-            mtp
-            for mtp in path_to_dataset_metadata.glob("*.json")
-            if mtp.name.removesuffix(".json") == rosbag_name
-        ),
-        None,
-    )
-
-    if rosbag_metadata_path is None or not rosbag_metadata_path.exists():
-        console.print(
-            f"Impossible to find metadata for {rosbag_name} in {path_to_dataset_metadata}"
-        )
+    #NOTE: this is only possible beacuse it looks that 1:1 sequence to metadata 
+    path = dataset_path / "metadata" / f"{rosbag_name}.json"
+    if not path.is_file():
+        console.print(f"Impossible to find metadata for {rosbag_name} in {path.parent}")
         return None
-
-    with open(rosbag_metadata_path) as f:
-        return json.load(f)
+    return json.loads(path.read_text())
 
 
 def prune_datasets(
@@ -137,32 +124,14 @@ def prune_datasets(
     datasets = load_all(dataset_to_prune_name)
     profile = MosaicoProfile.resolve()
 
-    if not datasets:
-        console.print(
-            f"[bold red] Impossible to prune {dataset_to_prune_name}. These are not valid dataset names[/bold red]"
-        )
-
     for ds in datasets.values():
         # Sequence names coincide with rosbag names
-        rosbag_names_to_prune = [
-            get_name_from_rosbag(bp) for bp in get_rosbag_paths(ds.bags)
-        ]
+        rosbag_names_to_prune = [bp.stem for bp in get_rosbag_paths(ds.bags)]
 
-        with MosaicoClient.connect(
-            host=profile.host,
-            port=profile.port,
-            api_key=profile.api_key,
-            enable_tls=profile.enable_tls,
-            tls_cert_path=profile.tls_cert_path,
-        ) as client:
-            all_loaded_sequences = client.list_sequences()
-
+        with connect(profile) as client:
             sequences_to_prune = list(
-                set(all_loaded_sequences) & set(rosbag_names_to_prune)
-            )
-
-            if n_bags_to_prune is not None:
-                sequences_to_prune = sequences_to_prune[:n_bags_to_prune]
+                set(client.list_sequences()) & set(rosbag_names_to_prune)
+            )[:n_bags_to_prune]
 
             console.print(f"[bold]Pruning {len(sequences_to_prune)} sequences [/bold]")
 
@@ -209,24 +178,14 @@ def load_datasets(
             continue
 
         # 2) Get already loaded sequences so to avoid loading them again
-        all_loaded_sequences = []
-        with MosaicoClient.connect(
-            host=profile.host,
-            port=profile.port,
-            api_key=profile.api_key,
-            enable_tls=profile.enable_tls,
-            tls_cert_path=profile.tls_cert_path,
-        ) as client:
-            all_loaded_sequences.extend(client.list_sequences())
+        with connect(profile) as client:
+            all_loaded_sequences = set(client.list_sequences())
 
         filtered_rosbags = [
             bag_pt
             for bag_pt in ros_bag_paths
-            if get_name_from_rosbag(bag_pt) not in all_loaded_sequences
-        ]
-
-        if n_bags_to_load is not None:
-            filtered_rosbags = filtered_rosbags[:n_bags_to_load]
+            if bag_pt.stem not in all_loaded_sequences
+        ][:n_bags_to_load]
 
         console.print(
             f"[bold green]Loading {len(filtered_rosbags)} from {len(ros_bag_paths)} found bags from {ds.bags} [/bold green]"
@@ -251,7 +210,7 @@ def load_datasets(
                 )
                 continue
 
-            sequence_name = get_name_from_rosbag(bag_path)
+            sequence_name = bag_path.stem
 
             injestor_config = ROSInjectionConfig(
                 file_path=bag_path,
@@ -281,13 +240,7 @@ def load_datasets(
                 elapsed_time = time.monotonic() - start
 
                 # Filling statistics table
-                with MosaicoClient.connect(
-                    host=profile.host,
-                    port=profile.port,
-                    api_key=profile.api_key,
-                    enable_tls=profile.enable_tls,
-                    tls_cert_path=profile.tls_cert_path,
-                ) as client:
+                with connect(profile) as client:
                     s_hanlder = client.sequence_handler(sequence_name)
 
                     assert s_hanlder is not None
@@ -359,10 +312,7 @@ def unload_datasets(
             )
             continue
 
-        if n_sequences is not None:
-            filtered_ros_bag_paths = ros_bag_paths[:n_sequences]
-        else:
-            filtered_ros_bag_paths = ros_bag_paths
+        filtered_ros_bag_paths = ros_bag_paths[:n_sequences]
 
         console.print(
             f"[bold green]Loading {len(filtered_ros_bag_paths)} from {len(ros_bag_paths)} found bags from {ds.bags} [/bold green]"
@@ -385,8 +335,7 @@ def unload_datasets(
                 )
                 continue
 
-            # Strip final file from bag_path
-            sequence_name = get_name_from_rosbag(bag_path)
+            sequence_name = bag_path.stem
 
             ext_configs = ROSExtractorConfig(
                 saving_path=ds.output,
@@ -418,14 +367,7 @@ def unload_datasets(
                 elapsed_time = time.monotonic() - start
 
                 # Filling statistics table
-
-                with MosaicoClient.connect(
-                    host=profile.host,
-                    port=profile.port,
-                    api_key=profile.api_key,
-                    enable_tls=profile.enable_tls,
-                    tls_cert_path=profile.tls_cert_path,
-                ) as client:
+                with connect(profile) as client:
                     s_hanlder = client.sequence_handler(sequence_name)
 
                     assert s_hanlder is not None
@@ -433,16 +375,9 @@ def unload_datasets(
                         s_hanlder.total_size_bytes / 1024.0 / 1024.0 / 1024.0
                     )  # Gb
 
-                # Same rule as the SDK's writer: ROS1 always writes a .bag
-                if ds.ros_distro is Stores.ROS1_NOETIC:
-                    bag_extension = ".bag"
-                elif ds.storage_plugin is StoragePlugin.MCAP:
-                    bag_extension = ".mcap"
-                else:
-                    bag_extension = ".db3"
-
-                reconstructed_bag_file = (
-                    ds.output / sequence_name / (sequence_name + bag_extension)
+                # Whatever extension the SDK's writer picked (.bag / .mcap / .db3)
+                reconstructed_bag_file = next(
+                    (ds.output / sequence_name).glob(f"{sequence_name}.*")
                 )
 
                 reconstructed_size_gb = (

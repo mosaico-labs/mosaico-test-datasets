@@ -1,14 +1,14 @@
-import signal
 import sys
 import time
 
 import click
-from mosaicolabs import MosaicoClient, SequenceDataStreamer
+from mosaicolabs import SequenceDataStreamer
 from mosaicolabs_cli.utils.mosaico_profile import MosaicoProfile
 from rich.console import Console
 from rich.table import Table
 
 from . import ros_bridge
+from .helper import connect
 from .ros_bridge import (
     load_datasets,
     prune_datasets,
@@ -163,33 +163,6 @@ def run_unload_datasets(datasets, all, n_sequences):
 console = Console()
 
 
-START_STREAMING_TIMEOUT_S = 1.0  # in seconds
-
-
-def kill_after_timeout(func):
-
-    def wrapper(*args, **kwargs):
-
-        def handler(signum, frame):
-            raise TimeoutError(
-                f"Function call exceded expeced timeout: {START_STREAMING_TIMEOUT_S}s"
-            )
-
-        old = signal.signal(signal.SIGALRM, handler)
-        signal.setitimer(signal.ITIMER_REAL, START_STREAMING_TIMEOUT_S)
-
-        try:
-            return func(*args, **kwargs)
-
-        finally:
-            # Resetting previous SIGNAL handler
-            signal.setitimer(signal.ITIMER_REAL, 0)  # always disarm the timer
-            signal.signal(signal.SIGALRM, old)  # restore prior handler
-
-    return wrapper
-
-
-# @kill_after_timeout
 def start_streaming(stremer: SequenceDataStreamer):
     for _, _ in stremer:
         return  # returns immediatelly as soon as first message arrives
@@ -206,17 +179,9 @@ def check_timestream_start(max_streasming_start_th_s: float):
             streaming requires more that this time the sequence streaming is interrupted.
     """
 
-    START_STREAMING_TIMEOUT_S = max_streasming_start_th_s
+    timeout = max_streasming_start_th_s
 
-    profile = MosaicoProfile.resolve()
-
-    with MosaicoClient.connect(
-        host=profile.host,
-        port=profile.port,
-        api_key=profile.api_key,
-        enable_tls=profile.enable_tls,
-        tls_cert_path=profile.tls_cert_path,
-    ) as client:
+    with connect(MosaicoProfile.resolve()) as client:
         all_loaded_sequences = client.list_sequences()
 
         # Create table
@@ -242,13 +207,9 @@ def check_timestream_start(max_streasming_start_th_s: float):
             # Streaming test on sequence handler
             sequence_stremer: SequenceDataStreamer = s_handler.get_data_streamer()
 
-            try:
-                start = time.monotonic()
-                start_streaming(sequence_stremer)
-                elapsed_time = time.monotonic() - start
-
-            except TimeoutError:
-                elapsed_time = START_STREAMING_TIMEOUT_S
+            start = time.monotonic()
+            start_streaming(sequence_stremer)
+            elapsed_time = time.monotonic() - start
 
             table.add_row(
                 s_handler.name,  # Sequence name
@@ -257,9 +218,9 @@ def check_timestream_start(max_streasming_start_th_s: float):
                 f"{(s_handler.total_size_bytes / 1024.0 / 1024.0 / 1024.0):0.2f}Gb",  # Sequence size
                 "-",  # Chunk numbers (not available here)
                 f"{elapsed_time:0.2f}"
-                if elapsed_time < START_STREAMING_TIMEOUT_S
-                else f"Greater than timeout {START_STREAMING_TIMEOUT_S}s: {elapsed_time}",  # Streaming start time
-                style=None if elapsed_time < START_STREAMING_TIMEOUT_S else "on red",
+                if elapsed_time < timeout
+                else f"Greater than timeout {timeout}s: {elapsed_time}",  # Streaming start time
+                style=None if elapsed_time < timeout else "on red",
             )
 
             sequence_stremer.close()
@@ -273,13 +234,9 @@ def check_timestream_start(max_streasming_start_th_s: float):
                 # Streaming test on topic handler
                 topic_stremer: SequenceDataStreamer = s_handler.get_data_streamer()
 
-                try:
-                    start = time.monotonic()
-                    start_streaming(topic_stremer)
-                    elapsed_time = time.monotonic() - start
-
-                except TimeoutError:
-                    elapsed_time = START_STREAMING_TIMEOUT_S
+                start = time.monotonic()
+                start_streaming(topic_stremer)
+                elapsed_time = time.monotonic() - start
 
                 table.add_row(
                     "-",  # Sequence name (not available here)
@@ -290,11 +247,9 @@ def check_timestream_start(max_streasming_start_th_s: float):
                     if t_handler.chunks_number
                     else "Unk",  # Chunk numbers
                     f"{elapsed_time:0.2f}"
-                    if elapsed_time < START_STREAMING_TIMEOUT_S
-                    else f"Greater than timeout {START_STREAMING_TIMEOUT_S}s",  # Streaming start time
-                    style=None
-                    if elapsed_time < START_STREAMING_TIMEOUT_S
-                    else "on red",
+                    if elapsed_time < timeout
+                    else f"Greater than timeout {timeout}s",  # Streaming start time
+                    style=None if elapsed_time < timeout else "on red",
                 )
 
                 topic_stremer.close()
