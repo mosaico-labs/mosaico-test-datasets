@@ -34,14 +34,9 @@ class RosbagHandler:
     DATASET_CONFIG_FILENAME = DATASET_CONFIG_FILENAME
 
     CONFIG_KEY_NAMES = [
-        "MOSAICO_HOST",
-        "MOSAICO_PORT",
         "PATH_TO_BAGS",
         "ROS_DISTRO",
         "TOPICS_TO_FILTER",
-        "API_KEY",
-        "ENABLE_TLS",
-        "TLS_CERT_PATH",
         "PATH_TO_RECONSTRUCTED_BAGS",
         "STORAGE_PLUGIN",
         "START_TIMESTAMP_NS",

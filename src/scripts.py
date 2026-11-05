@@ -21,6 +21,7 @@ from mosaicolabs.bridges.ros import (
     ROSInjectionConfig,
     ROSSequenceExtractor,
 )
+from mosaicolabs_cli.utils.mosaico_profile import MosaicoProfile
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -53,6 +54,7 @@ def prune_datasets(
     """
 
     global_configs = load_global_config(BASE_DIR)
+    profile = MosaicoProfile.resolve()
 
     dataset_to_prune_paths_ = discover_datasets(DATASETS_DIR, dataset_to_prune_name)
 
@@ -77,11 +79,11 @@ def prune_datasets(
         ]
 
         with MosaicoClient.connect(
-            host=configs["MOSAICO_HOST"],
-            port=configs["MOSAICO_PORT"],
-            api_key=configs["API_KEY"],
-            enable_tls=configs["ENABLE_TLS"],
-            tls_cert_path=configs["TLS_CERT_PATH"],
+            host=profile.host,
+            port=profile.port,
+            api_key=profile.api_key,
+            enable_tls=profile.enable_tls,
+            tls_cert_path=profile.tls_cert_path,
         ) as client:
             all_loaded_sequences = client.list_sequences()
 
@@ -118,6 +120,7 @@ def load_datasets(
     """
 
     global_configs = load_global_config(BASE_DIR)
+    profile = MosaicoProfile.resolve()
 
     dataset_to_load_paths_ = discover_datasets(DATASETS_DIR, datasets_name_to_load)
 
@@ -144,11 +147,11 @@ def load_datasets(
         # 2) Get already loaded sequences so to avoid loading them again
         all_loaded_sequences = []
         with MosaicoClient.connect(
-            host=configs["MOSAICO_HOST"],
-            port=configs["MOSAICO_PORT"],
-            api_key=configs["API_KEY"],
-            enable_tls=configs["ENABLE_TLS"],
-            tls_cert_path=configs["TLS_CERT_PATH"],
+            host=profile.host,
+            port=profile.port,
+            api_key=profile.api_key,
+            enable_tls=profile.enable_tls,
+            tls_cert_path=profile.tls_cert_path,
         ) as client:
             all_loaded_sequences.extend(client.list_sequences())
 
@@ -190,15 +193,15 @@ def load_datasets(
                 file_path=bag_path,
                 sequence_name=sequence_name,
                 metadata=handler.get_metadata(sequence_name) or {},
-                host=configs["MOSAICO_HOST"],
-                port=configs["MOSAICO_PORT"],
+                host=profile.host,
+                port=profile.port,
                 log_level="WARNING",
                 topics=configs["TOPICS_TO_FILTER"],
                 ros_distro=configs["ROS_DISTRO"],
                 on_error=SessionLevelErrorPolicy.Delete,
-                mosaico_api_key=configs["API_KEY"],
-                enable_tls=configs["ENABLE_TLS"],
-                tls_cert_path=configs["TLS_CERT_PATH"],
+                mosaico_api_key=profile.api_key,
+                enable_tls=profile.enable_tls,
+                tls_cert_path=profile.tls_cert_path,
             )
 
             rosbag_size_mb = bag_path.stat().st_size / (1024 * 1024)
@@ -215,11 +218,11 @@ def load_datasets(
 
                 # Filling statistics table
                 with MosaicoClient.connect(
-                    host=configs["MOSAICO_HOST"],
-                    port=configs["MOSAICO_PORT"],
-                    api_key=configs["API_KEY"],
-                    enable_tls=configs["ENABLE_TLS"],
-                    tls_cert_path=configs["TLS_CERT_PATH"],
+                    host=profile.host,
+                    port=profile.port,
+                    api_key=profile.api_key,
+                    enable_tls=profile.enable_tls,
+                    tls_cert_path=profile.tls_cert_path,
                 ) as client:
                     s_hanlder = client.sequence_handler(sequence_name)
 
@@ -274,6 +277,7 @@ def unload_datasets(
     """
 
     global_configs = load_global_config(BASE_DIR)
+    profile = MosaicoProfile.resolve()
 
     dataset_to_load_paths_ = discover_datasets(DATASETS_DIR, datasets_name_to_unload)
 
@@ -329,15 +333,15 @@ def unload_datasets(
             ext_configs = ROSExtractorConfig(
                 saving_path=Path(configs["PATH_TO_RECONSTRUCTED_BAGS"]),
                 sequence_name=sequence_name,
-                host=configs["MOSAICO_HOST"],
-                port=configs["MOSAICO_PORT"],
+                host=profile.host,
+                port=profile.port,
                 ros_distro=configs["ROS_DISTRO"],
                 storage_plugin=configs["STORAGE_PLUGIN"],
                 topics=configs["TOPICS_TO_FILTER"],
                 log_level="WARNING",
-                mosaico_api_key=configs["API_KEY"],
-                tls_cert_path=configs["TLS_CERT_PATH"],
-                enable_tls=configs["ENABLE_TLS"],
+                mosaico_api_key=profile.api_key,
+                tls_cert_path=profile.tls_cert_path,
+                enable_tls=profile.enable_tls,
                 start_timestamp_ns=configs["START_TIMESTAMP_NS"],
                 end_timestamp_ns=configs["END_TIMESTAMP_NS"],
                 overwrite=True,
@@ -358,11 +362,11 @@ def unload_datasets(
                 # Filling statistics table
 
                 with MosaicoClient.connect(
-                    host=configs["MOSAICO_HOST"],
-                    port=configs["MOSAICO_PORT"],
-                    api_key=configs["API_KEY"],
-                    enable_tls=configs["ENABLE_TLS"],
-                    tls_cert_path=configs["TLS_CERT_PATH"],
+                    host=profile.host,
+                    port=profile.port,
+                    api_key=profile.api_key,
+                    enable_tls=profile.enable_tls,
+                    tls_cert_path=profile.tls_cert_path,
                 ) as client:
                     s_hanlder = client.sequence_handler(sequence_name)
 
@@ -460,14 +464,14 @@ def check_timestream_start(max_streasming_start_th_s: float):
 
     START_STREAMING_TIMEOUT_S = max_streasming_start_th_s
 
-    global_configs = load_global_config(BASE_DIR)
+    profile = MosaicoProfile.resolve()
 
     with MosaicoClient.connect(
-        host=global_configs["MOSAICO_HOST"],
-        port=global_configs["MOSAICO_PORT"],
-        api_key=global_configs["API_KEY"],
-        enable_tls=global_configs["ENABLE_TLS"],
-        tls_cert_path=global_configs["TLS_CERT_PATH"],
+        host=profile.host,
+        port=profile.port,
+        api_key=profile.api_key,
+        enable_tls=profile.enable_tls,
+        tls_cert_path=profile.tls_cert_path,
     ) as client:
         all_loaded_sequences = client.list_sequences()
 
